@@ -1,0 +1,6 @@
+{
+  "name": "TrustOS — AI Conscience Layer",
+  "description": "A middleware system that uses deterministic math to detect AI bias and Gemini to explain it. Solves the trust paradox through a 3-layer security architecture.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

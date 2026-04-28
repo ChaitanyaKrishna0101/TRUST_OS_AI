@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Courier New", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  --bg: #f8fafc;
+  --ink: #0f1724;
+  --line: #e2e8f0;
+  --truth: #ef4444;
+  --guide: #3b82f6;
+  --valid: #22c55e;
+}

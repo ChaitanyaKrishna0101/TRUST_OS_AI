@@ -1,0 +1,111 @@
+Refactor and improve my AI fairness audit application with the following strict requirements. Focus on fixing functionality, clarity, and real user experience. Do not add unnecessary features.
+
+1. FILE UPLOAD (CRITICAL FIX)
+- Fix file upload so it works reliably for both small and reasonably large datasets
+- Remove any broken logic or fallback behavior
+- Do NOT show labels like “large CSV” or “small CSV”
+- Keep it simple: “Upload Dataset”
+- Show clear messages:
+  - “Uploading…”
+  - “Processing file…”
+  - “File loaded successfully”
+- If upload fails, show exact error (no generic “failed” message)
+
+2. SIMPLIFY UI (REMOVE CLUTTER)
+- Remove unnecessary elements from left and right sidebars
+- Keep only essential controls:
+  - Upload
+  - Problem selection
+  - Start analysis
+- Avoid overdesign and unused icons/buttons
+- Ensure everything fits in one clean screen (minimal scrolling)
+
+3. SHOW 15 PROBLEMS ON HOME SCREEN
+- Display all 15 problem statements clearly on the starting interface
+- Make it visible that the system solves real-world problems
+- Allow user to select one problem after upload
+- Keep layout clean (grid/cards format)
+
+4. PARADOX + TRUST DISPLAY (IMPORTANT)
+- Clearly show the AI trust paradox in UI:
+  “If AI detects bias, can it also be biased?”
+- Display the system answer clearly:
+  - Math decides fairness
+  - AI only explains
+- This must be visible before or during analysis
+
+5. 3-LAYER SYSTEM VISUALIZATION
+Show system architecture visually with animations:
+
+Layer 1: Math Engine (Decision)
+Layer 2: Processing Layer
+Layer 3: AI Explanation
+
+- Use connected lines between layers
+- Animate transitions between layers
+- Highlight active layer with color changes
+
+6. STEP-BY-STEP FLOW WITH ANIMATIONS
+Execution must NOT be instant. Show step progression:
+
+Steps:
+1. Upload dataset
+2. Validate data
+3. Select problem
+4. Process data
+5. Detect groups
+6. Calculate metrics
+7. Detect bias
+8. Generate explanation
+9. Show results
+
+For each step:
+- Highlight current step
+- Animate transition (line movement / color fill)
+- Show progress (percentage or progress bar)
+- Use smooth transitions (no sudden jumps)
+
+7. VISUAL ANIMATIONS (PREMIUM BUT CLEAN)
+- Add:
+  - Progress bar (0–100%)
+  - Line connection animations between steps
+  - Color transitions when step completes
+  - Loading animations during processing
+- Keep animations smooth and meaningful (not excessive)
+
+8. LIVE PROCESS EXPLANATION
+At each step show simple messages:
+
+Examples:
+- “Reading your dataset…”
+- “Cleaning data…”
+- “Detecting groups…”
+- “Calculating fairness metrics…”
+
+- Show small outputs:
+  - detected groups
+  - counts
+  - metrics
+
+9. SIMPLE LANGUAGE (VERY IMPORTANT)
+- Avoid technical jargon
+- Make explanations understandable even for beginners
+- Use short, clear sentences
+
+10. REMOVE BROKEN OR UNUSED FEATURES
+- Identify features that are not working properly
+- Remove them completely
+- Keep only what directly supports:
+  - bias detection
+  - explanation
+  - improvement
+
+11. FINAL EXPERIENCE GOAL
+- Clean, structured, and smooth flow
+- Minimal UI, maximum clarity
+- User should understand:
+  - what is happening
+  - why it is happening
+  - what the result means
+
+Do NOT overengineer. Focus on clarity, reliability, and real impact.

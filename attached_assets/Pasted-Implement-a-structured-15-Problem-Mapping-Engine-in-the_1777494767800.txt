@@ -1,0 +1,84 @@
+Implement a structured “15 Problem Mapping Engine” in the application. This is a core feature and must work reliably.
+
+1. PURPOSE
+- The system must NOT treat all datasets the same
+- It must analyze data based on a selected real-world problem (context)
+- Each problem defines how the dataset should be interpreted
+
+2. ADD 15 PROBLEM OPTIONS (UI)
+- Display all 15 problems clearly on the interface (grid/cards)
+- User must select ONE problem after uploading dataset
+- Do not proceed without problem selection
+
+3. DEFINE PROBLEM MAPPINGS (CORE LOGIC)
+Create a mapping system like:
+
+Problem → Required Columns → Role
+
+Example:
+Hiring Bias:
+- sensitive: gender
+- outcome: selected
+
+Loan Bias:
+- sensitive: gender
+- outcome: approved
+- feature: income
+
+Implement all 15 problems with clearly defined:
+- sensitive attribute
+- outcome column
+- optional feature column
+
+4. DATASET VALIDATION
+After user selects a problem:
+
+- Check if required columns exist in dataset
+- If missing:
+  - Show clear error:
+    “This problem requires columns: gender, selected”
+  - Stop execution
+
+- Do NOT guess silently without informing user
+
+5. AUTO COLUMN MATCHING (SMART BEHAVIOR)
+- If exact column names not found:
+  - Try simple matching:
+    “Gender” → gender
+    “Sex” → gender
+    “Approved_Status” → approved
+
+- Show suggestion:
+  “We matched ‘Sex’ as ‘gender’”
+
+- Allow user to manually confirm or change mapping
+
+6. ANALYSIS BASED ON PROBLEM
+- Use selected mapping to:
+  - group dataset
+  - calculate fairness metrics
+  - detect bias
+
+- Do NOT use generic logic
+
+7. ERROR HANDLING
+- If dataset is incompatible:
+  - Show clear message
+  - Do not crash or reset
+- Example:
+  “Selected problem cannot be applied to this dataset”
+
+8. CLEAN IMPLEMENTATION
+- Keep mapping logic separate (e.g., config file or object)
+- Avoid hardcoding inside main logic
+- Make it easy to extend in future
+
+9. USER FLOW (STRICT)
+Upload Dataset → Select Problem → Validate Columns → Map Columns → Run Analysis
+
+10. FINAL GOAL
+- System must feel intelligent and context-aware
+- Each dataset should be analyzed differently based on problem
+- User must clearly understand what is being analyzed and why
+
+Do NOT overengineer. Focus on clarity, reliability, and correct mapping logic.

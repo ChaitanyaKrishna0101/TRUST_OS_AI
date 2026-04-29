@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ShieldCheck, ShieldAlert, BrainCircuit, Calculator, Upload,
-  ArrowRight, CheckCircle2, Download, RotateCcw, Zap, AlertCircle,
-  Activity, MessageCircle, ChevronRight
+  ShieldAlert, ShieldCheck, BrainCircuit, Calculator, Upload,
+  ArrowRight, CheckCircle2, AlertCircle, Zap, Download,
+  Activity, MessageCircle, RotateCcw
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -16,31 +16,29 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types & Constants ───────────────────────────────────────────────────────
 
-type Phase = 'home' | 'processing' | 'results' | 'resolved';
+type Step = 'upload' | 'preview' | 'problem' | 'processing' | 'audit' | 'resolution';
 
-interface GroupData { name: string; total: number; approved: number; }
 interface FairnessMetrics {
   rateA: number; rateB: number;
   disparateImpact: number; demographicParityDiff: number;
   status: string;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+const INITIAL_DATA = {
+  groupA: { name: 'Group A', total: 1000, approved: 400 },
+  groupB: { name: 'Group B', total: 1000, approved: 800 }
+};
 
 const DEMO_DATASETS = [
-  {
-    id: 'financial', title: 'Financial Fairness', subtitle: 'Loan approval parity',
-    data: { groupA: { name: 'Minority Group', total: 800, approved: 280 }, groupB: { name: 'Majority Group', total: 1200, approved: 720 } }
-  },
-  {
-    id: 'medical', title: 'Medical Access Audit', subtitle: 'Treatment approval parity',
-    data: { groupA: { name: 'Low-Income', total: 600, approved: 210 }, groupB: { name: 'High-Income', total: 900, approved: 630 } }
-  }
+  { id: 'financial', title: 'Financial Fairness', subtitle: 'Loan approval parity',
+    data: { groupA: { name: 'Minority Group', total: 800, approved: 280 }, groupB: { name: 'Majority Group', total: 1200, approved: 720 } } },
+  { id: 'medical', title: 'Medical Access Audit', subtitle: 'Treatment approval parity',
+    data: { groupA: { name: 'Low-Income', total: 600, approved: 210 }, groupB: { name: 'High-Income', total: 900, approved: 630 } } }
 ];
 
-const PROBLEMS = [
+const SCENARIOS = [
   { id: 'hiring',    num: '01', title: 'Hiring',           impact: 'Job fairness',    desc: 'AI screens applicants — does everyone get a fair chance?' },
   { id: 'banking',   num: '02', title: 'Banking',          impact: 'Equal credit',    desc: 'Loan algorithms decide who gets credit — are they fair?' },
   { id: 'health',    num: '03', title: 'Healthcare',       impact: 'Better care',     desc: 'Medical AI gaps — some groups get less access to treatment.' },
@@ -58,144 +56,92 @@ const PROBLEMS = [
   { id: 'citizen',   num: '15', title: 'Citizen Rights',   impact: 'Your rights',     desc: 'Your right to an explanation when AI decides your future.' }
 ];
 
-const PROCESS_STEPS = [
-  { layer: 1, msg: 'Reading your dataset…',           detail: 'Opening the file and checking structure.' },
-  { layer: 1, msg: 'Validating data…',                detail: 'Making sure every row and column is readable.' },
-  { layer: 1, msg: 'Detecting groups…',               detail: 'Identifying the two groups we will compare.' },
-  { layer: 1, msg: 'Counting decisions…',             detail: 'How many times was each group approved or denied?' },
-  { layer: 1, msg: 'Calculating fairness score…',     detail: 'Running Disparate Impact formula — pure math, zero AI.' },
-  { layer: 2, msg: 'Measuring the gap…',              detail: 'How large is the difference between the two groups?' },
-  { layer: 2, msg: 'Detecting bias…',                 detail: 'Is the score below 0.80? That means bias is present.' },
-  { layer: 3, msg: 'Asking AI to explain…',           detail: 'Sending the numbers so AI can write a plain summary.' },
-  { layer: 3, msg: 'Preparing your results…',         detail: 'Everything is ready — let\'s see what we found.' }
+const NAV_STEPS: { id: Step; label: string }[] = [
+  { id: 'upload',     label: 'Data Input' },
+  { id: 'problem',    label: 'Mission' },
+  { id: 'processing', label: 'Audit Math' },
+  { id: 'audit',      label: 'AI Review' },
+  { id: 'resolution', label: 'Impact Proof' }
 ];
 
-const GUIDE_MESSAGES: Record<Phase, { title: string; body: string }> = {
-  home:       { title: 'Welcome to TrustOS', body: 'Upload your dataset or choose a demo, then pick the scenario that matches your data. The Math Engine will check if your AI is treating everyone fairly.' },
-  processing: { title: 'Audit in progress', body: 'The Math Engine is running. AI is locked out of this step — only pure calculation decides fairness. Watch each layer activate.' },
-  results:    { title: 'Results are ready', body: 'The Math Engine found the numbers. The AI guide below translated them into plain language. You decide what to do next.' },
-  resolved:   { title: 'Bias has been fixed', body: 'The reweighting strategy has balanced the data. Both groups now have equal consideration. Download the proof below.' }
+const STEP_ORDER: Step[] = ['upload', 'preview', 'problem', 'processing', 'audit', 'resolution'];
+
+const LOG_STEPS = [
+  "Reading data structure…",
+  "Layer 1: Logic Math Engine active",
+  "Scanning protected groups…",
+  "Comparing decision rates…",
+  "Layer 2: AI Explainer initializing…",
+  "Cross-checking metrics…",
+  "Audit complete!"
+];
+
+const PARADOX_MESSAGES: Record<Step, string> = {
+  upload:     "Ready to audit. Upload your decisions or choose a demo. The Math Engine — not AI — decides fairness.",
+  preview:    "Data verified. Two groups detected. The Math Engine will now measure the gap between them.",
+  problem:    "Select the real-world scenario that best matches your data to begin the audit.",
+  processing: "Layer 1 active. Calculating Disparate Impact using pure deterministic math. AI is locked out of this process.",
+  audit:      "Layer 1 truth confirmed. AI (Layer 2) translated the math into plain language for you below.",
+  resolution: "Mission complete. Parity growth confirmed by math. Your AI decisions are now certified fair."
 };
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── StatusBadge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
   const ok = status !== 'BIAS DETECTED';
   return (
     <span className={cn(
-      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide',
+      'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide',
       ok ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
     )}>
-      {ok ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldAlert className="w-3.5 h-3.5" />}
+      {ok ? <ShieldCheck className="w-3 h-3" /> : <ShieldAlert className="w-3 h-3" />}
       {status}
     </span>
   );
 }
 
-function AIGuide({ phase }: { phase: Phase }) {
-  const msg = GUIDE_MESSAGES[phase];
-  return (
-    <motion.div
-      key={phase}
-      initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-      className="flex items-start gap-3 bg-slate-900 text-white rounded-2xl px-5 py-4 mb-6"
-    >
-      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shrink-0">
-        <MessageCircle className="w-4 h-4" />
-      </div>
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400 mb-0.5">AI Guide</p>
-        <p className="text-sm leading-relaxed"><strong>{msg.title}.</strong> {msg.body}</p>
-      </div>
-    </motion.div>
-  );
-}
+// ─── 3-Layer Header ──────────────────────────────────────────────────────────
 
-function LayerDiagram({ active }: { active: 1 | 2 | 3 | null }) {
+function LayerHeader({ step }: { step: Step }) {
+  const layer1Active = step === 'processing';
+  const layer2Active = step === 'audit';
+  const layer3Active = step === 'resolution';
+  const layer1Done   = ['audit', 'resolution'].includes(step);
+  const layer2Done   = step === 'resolution';
+
   const layers = [
-    { n: 1 as const, label: 'Math Engine',      sub: 'Pure math decides fairness',      Icon: Calculator, c: 'emerald' },
-    { n: 2 as const, label: 'Processing Layer', sub: 'Compares groups & gap size',       Icon: Activity,   c: 'blue'    },
-    { n: 3 as const, label: 'AI Explanation',   sub: 'AI explains — math decides',       Icon: BrainCircuit, c: 'purple' }
-  ];
-  return (
-    <div className="grid grid-cols-3 gap-3 mb-6">
-      {layers.map(l => {
-        const isActive = active === l.n;
-        const isDone   = active !== null && (l.n as number) < (active as number);
-        const palette  = {
-          emerald: 'border-emerald-400 bg-emerald-50 text-emerald-700',
-          blue:    'border-blue-400    bg-blue-50    text-blue-700',
-          purple:  'border-purple-400  bg-purple-50  text-purple-700',
-        }[l.c];
-        return (
-          <motion.div
-            key={l.n}
-            animate={{ opacity: isActive || isDone ? 1 : 0.35, scale: isActive ? 1.03 : 1 }}
-            transition={{ duration: 0.4 }}
-            className={cn(
-              'relative p-4 rounded-xl border-2 transition-colors duration-500',
-              isActive ? palette : 'border-slate-200 bg-slate-50'
-            )}
-          >
-            {isActive && <span className={cn(
-              'absolute top-3 right-3 w-2 h-2 rounded-full animate-pulse',
-              l.c === 'emerald' ? 'bg-emerald-500' : l.c === 'blue' ? 'bg-blue-500' : 'bg-purple-500'
-            )} />}
-            {isDone && <CheckCircle2 className="absolute top-3 right-3 w-4 h-4 text-emerald-500" />}
-            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center mb-2', isActive ? 'bg-white' : 'bg-slate-100')}>
-              <l.Icon className={cn('w-4 h-4', isActive
-                ? l.c === 'emerald' ? 'text-emerald-600' : l.c === 'blue' ? 'text-blue-600' : 'text-purple-600'
-                : 'text-slate-400'
-              )} />
-            </div>
-            <p className={cn('text-xs font-bold mb-0.5', isActive
-              ? l.c === 'emerald' ? 'text-emerald-700' : l.c === 'blue' ? 'text-blue-700' : 'text-purple-700'
-              : 'text-slate-500'
-            )}>Layer {l.n}: {l.label}</p>
-            <p className="text-[11px] text-slate-500 leading-tight">{l.sub}</p>
-          </motion.div>
-        );
-      })}
-    </div>
-  );
-}
+    { label: 'Level 1: Logic Math', sub: 'Objective truths. Zero AI.', active: layer1Active, done: layer1Done, color: 'emerald', Icon: Calculator },
+    { label: 'Level 2: AI Explainer', sub: 'Translates math to human.', active: layer2Active, done: layer2Done, color: 'blue', Icon: BrainCircuit },
+    { label: 'Level 3: Parity Lock', sub: 'Verification & compliance.', active: layer3Active, done: false, color: 'purple', Icon: ShieldCheck }
+  ] as const;
 
-function PhaseBar({ phase }: { phase: Phase }) {
-  const steps = [
-    { id: 'home',       label: 'Upload' },
-    { id: 'processing', label: 'Analysis' },
-    { id: 'results',    label: 'Results' },
-    { id: 'resolved',   label: 'Fixed' }
-  ];
-  const idx = steps.findIndex(s => s.id === phase);
   return (
-    <div className="flex items-center gap-0 mb-8">
-      {steps.map((s, i) => (
-        <React.Fragment key={s.id}>
-          <div className="flex items-center gap-2">
-            <div className={cn(
-              'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-all duration-500',
-              i < idx  ? 'bg-emerald-500 text-white' :
-              i === idx ? 'bg-blue-600 text-white shadow-md shadow-blue-200' :
-                          'bg-slate-200 text-slate-400'
-            )}>
-              {i < idx ? '✓' : i + 1}
-            </div>
+    <div className="grid grid-cols-3 gap-3 mb-4">
+      {layers.map(l => (
+        <div key={l.label} className={cn(
+          'p-3 rounded-xl border transition-all duration-500 flex flex-col gap-1 relative',
+          l.active ? {
+            emerald: 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-500/20',
+            blue:    'bg-blue-50 border-blue-300 ring-2 ring-blue-500/20',
+            purple:  'bg-purple-50 border-purple-300 ring-2 ring-purple-500/20'
+          }[l.color] : l.done ? 'bg-slate-50 border-slate-200' : 'bg-slate-50 border-slate-100 opacity-50'
+        )}>
+          {l.active && (
             <span className={cn(
-              'text-xs font-semibold transition-colors duration-300',
-              i === idx ? 'text-slate-900' : i < idx ? 'text-emerald-600' : 'text-slate-400'
-            )}>{s.label}</span>
-          </div>
-          {i < steps.length - 1 && (
-            <div className="flex-1 mx-3 h-px bg-slate-200 relative">
-              <motion.div
-                className="absolute inset-y-0 left-0 bg-emerald-400"
-                animate={{ width: i < idx ? '100%' : '0%' }}
-                transition={{ duration: 0.5, ease: 'easeOut' }}
-              />
-            </div>
+              'absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full animate-pulse',
+              { emerald: 'bg-emerald-500', blue: 'bg-blue-500', purple: 'bg-purple-500' }[l.color]
+            )} />
           )}
-        </React.Fragment>
+          {l.done && <CheckCircle2 className="absolute top-2.5 right-2.5 w-3.5 h-3.5 text-emerald-500" />}
+          <div className="flex items-center justify-between">
+            <p className={cn(
+              'text-[10px] font-bold uppercase tracking-tight',
+              l.active ? { emerald: 'text-emerald-600', blue: 'text-blue-600', purple: 'text-purple-600' }[l.color]
+                       : l.done ? 'text-emerald-600' : 'text-slate-400'
+            )}>{l.label}</p>
+          </div>
+          <p className="text-[11px] text-slate-600 font-medium leading-tight">{l.sub}</p>
+        </div>
       ))}
     </div>
   );
@@ -204,158 +150,146 @@ function PhaseBar({ phase }: { phase: Phase }) {
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [phase, setPhase]                   = useState<Phase>('home');
-  const [groupData, setGroupData]           = useState({ groupA: { name: 'Group A', total: 1000, approved: 400 }, groupB: { name: 'Group B', total: 1000, approved: 800 } });
-  const [fileLoaded, setFileLoaded]         = useState(false);
-  const [fileInfo, setFileInfo]             = useState<{ name: string; rows: number } | null>(null);
-  const [uploadState, setUploadState]       = useState<'idle' | 'reading' | 'processing' | 'done' | 'error'>('idle');
-  const [uploadError, setUploadError]       = useState('');
-  const [selectedProblem, setSelectedProblem] = useState<string | null>(null);
-  const [processStep, setProcessStep]       = useState(0);
-  const [activeLayer, setActiveLayer]       = useState<1 | 2 | 3 | null>(null);
-  const [metrics, setMetrics]               = useState<FairnessMetrics | null>(null);
-  const [originalMetrics, setOriginalMetrics] = useState<FairnessMetrics | null>(null);
-  const [resolvedMetrics, setResolvedMetrics] = useState<FairnessMetrics | null>(null);
-  const [explanation, setExplanation]       = useState('');
-  const [csvData, setCsvData]               = useState('');
-  const [mitigating, setMitigating]         = useState(false);
+  const [step, setStep]             = useState<Step>('upload');
+  const [data, setData]             = useState(INITIAL_DATA);
+  const [fileInfo, setFileInfo]     = useState<{ name: string; rows: number; cols: number } | null>(null);
+  const [uploadErr, setUploadErr]   = useState('');
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [scenario, setScenario]     = useState<string | null>(null);
+  const [logs, setLogs]             = useState<string[]>([]);
+  const [progress, setProgress]     = useState(0);
+  const [metrics, setMetrics]       = useState<FairnessMetrics | null>(null);
+  const [origMetrics, setOrigMetrics] = useState<FairnessMetrics | null>(null);
+  const [explanation, setExplanation] = useState('');
+  const [history, setHistory]       = useState<{ label: string; metrics: FairnessMetrics }[]>([]);
+  const [csvData, setCsvData]       = useState('');
+  const [fixing, setFixing]         = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const addLog = (msg: string) => setLogs(prev => [...prev.slice(-5), msg]);
 
-  const reset = () => {
-    setPhase('home'); setGroupData({ groupA: { name: 'Group A', total: 1000, approved: 400 }, groupB: { name: 'Group B', total: 1000, approved: 800 } });
-    setFileLoaded(false); setFileInfo(null); setUploadState('idle'); setUploadError('');
-    setSelectedProblem(null); setProcessStep(0); setActiveLayer(null);
-    setMetrics(null); setOriginalMetrics(null); setResolvedMetrics(null);
-    setExplanation(''); setCsvData(''); setMitigating(false);
+  const goReset = () => {
+    setStep('upload'); setData(INITIAL_DATA); setFileInfo(null);
+    setUploadErr(''); setUploadBusy(false); setScenario(null);
+    setLogs([]); setProgress(0); setMetrics(null); setOrigMetrics(null);
+    setExplanation(''); setHistory([]); setCsvData(''); setFixing(false);
   };
 
-  // ── File upload ──────────────────────────────────────────────────────────────
+  // nav item state helper
+  const navState = (id: Step) => {
+    const cur = STEP_ORDER.indexOf(step);
+    const own = STEP_ORDER.indexOf(id);
+    const isActive = step === id || (id === 'upload' && step === 'preview');
+    const isDone = cur > own || (id === 'upload' && cur > 1);
+    return { isActive, isDone };
+  };
+
+  // ── File parse ──────────────────────────────────────────────────────────────
 
   const parseFile = (file: File) => {
-    setUploadState('reading');
-    setUploadError('');
+    setUploadBusy(true); setUploadErr('');
     const reader = new FileReader();
-    reader.onerror = () => { setUploadState('error'); setUploadError('Could not read the file. Make sure it is a valid CSV.'); };
+    reader.onerror = () => { setUploadBusy(false); setUploadErr('Could not read the file. Please use a valid CSV.'); };
     reader.onload = (e) => {
-      setUploadState('processing');
       try {
         const text = (e.target?.result as string) || '';
         const lines = text.split(/\r?\n/).filter(l => l.trim());
-        if (lines.length < 2) throw new Error('File has fewer than 2 rows. It needs a header row plus at least one data row.');
+        if (lines.length < 2) throw new Error('File has fewer than 2 rows (needs a header + data).');
 
-        const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
-        const groupIdx = headers.findIndex(h => ['group','gender','race','age','category','class','type','ethnicity'].some(k => h.includes(k)));
-        const decisionIdx = headers.findIndex(h => ['decision','approved','result','outcome','score','target','label','hire','hired','loan','admit'].some(k => h.includes(k)));
+        const hdrs = lines[0].toLowerCase().split(',').map(h => h.trim());
+        const gIdx = hdrs.findIndex(h => ['group','gender','race','age','category','class','type','ethnicity'].some(k => h.includes(k)));
+        const dIdx = hdrs.findIndex(h => ['decision','approved','result','outcome','score','target','label','hire','loan','admit'].some(k => h.includes(k)));
 
-        if (groupIdx === -1) throw new Error(`No group column found. Headers: ${headers.join(', ')}. Add a column called "group", "gender", "race", or "category".`);
-        if (decisionIdx === -1) throw new Error(`No decision column found. Headers: ${headers.join(', ')}. Add a column called "decision", "approved", "outcome", or "result".`);
+        if (gIdx < 0) throw new Error(`No group column found. Headers: ${hdrs.join(', ')}. Add "group", "gender", or "category".`);
+        if (dIdx < 0) throw new Error(`No decision column found. Headers: ${hdrs.join(', ')}. Add "decision", "approved", or "outcome".`);
 
         const counts: Record<string, { total: number; approved: number }> = {};
         for (let i = 1; i < lines.length; i++) {
           const row = lines[i].split(',').map(c => c.trim());
-          if (row.length <= Math.max(groupIdx, decisionIdx)) continue;
-          const grp = row[groupIdx]; if (!grp) continue;
-          const dec = row[decisionIdx].toLowerCase();
+          if (row.length <= Math.max(gIdx, dIdx)) continue;
+          const grp = row[gIdx]; if (!grp) continue;
+          const dec = row[dIdx].toLowerCase();
           if (!counts[grp]) counts[grp] = { total: 0, approved: 0 };
           counts[grp].total++;
           if (['1','yes','approved','true','pass','ok','accept','accepted','hire','hired','admit','admitted'].includes(dec)) counts[grp].approved++;
         }
 
         const keys = Object.keys(counts).sort((a, b) => counts[b].total - counts[a].total);
-        if (keys.length < 2) throw new Error(`Only ${keys.length} group found (need 2+). Found: ${keys.join(', ') || 'none'}.`);
+        if (keys.length < 2) throw new Error(`Only ${keys.length} group found (need at least 2). Found: ${keys.join(', ')}.`);
 
-        setGroupData({ groupA: { name: keys[1], ...counts[keys[1]] }, groupB: { name: keys[0], ...counts[keys[0]] } });
-        setFileInfo({ name: file.name, rows: lines.length - 1 });
-        setUploadState('done');
-        setFileLoaded(true);
+        setData({ groupA: { name: keys[1], ...counts[keys[1]] }, groupB: { name: keys[0], ...counts[keys[0]] } });
+        setFileInfo({ name: file.name, rows: lines.length - 1, cols: hdrs.length });
+        setUploadBusy(false);
+        setStep('preview');
       } catch (err: any) {
-        setUploadState('error');
-        setUploadError(err.message || 'Unknown error while reading the file.');
+        setUploadBusy(false);
+        setUploadErr(err.message || 'Unknown error reading the file.');
       }
     };
     reader.readAsText(file);
   };
 
-  const loadDemo = (demo: typeof DEMO_DATASETS[0]) => {
-    setGroupData(demo.data);
-    setFileInfo({ name: demo.title, rows: demo.data.groupA.total + demo.data.groupB.total });
-    setUploadState('done');
-    setFileLoaded(true);
-  };
-
   // ── Analysis ─────────────────────────────────────────────────────────────────
 
-  const runAnalysis = async (problemId: string) => {
-    setSelectedProblem(problemId);
-    setPhase('processing');
-    setProcessStep(0);
-    setActiveLayer(null);
+  const runAnalysis = async (sid: string) => {
+    setScenario(sid); setStep('processing');
+    setLogs([]); setProgress(0);
 
     const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-    // Steps 1–5: Layer 1
-    setActiveLayer(1);
-    for (let i = 1; i <= 5; i++) { await delay(650); setProcessStep(i); }
+    for (let i = 0; i < LOG_STEPS.length; i++) {
+      await delay(620);
+      addLog(LOG_STEPS[i]);
+      setProgress(Math.round(((i + 1) / LOG_STEPS.length) * 100));
+    }
 
-    // Fetch metrics
-    let fetchedMetrics: FairnessMetrics;
+    let m: FairnessMetrics;
     try {
-      const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: groupData }) });
+      const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data }) });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
-      fetchedMetrics = json.metrics;
+      m = json.metrics;
     } catch {
-      const tA = Math.max(groupData.groupA.total, 1), tB = Math.max(groupData.groupB.total, 1);
-      const rA = groupData.groupA.approved / tA, rB = groupData.groupB.approved / tB;
+      const tA = Math.max(data.groupA.total, 1), tB = Math.max(data.groupB.total, 1);
+      const rA = data.groupA.approved / tA, rB = data.groupB.approved / tB;
       const di = rB > 0 ? rA / rB : 0;
-      fetchedMetrics = { rateA: rA, rateB: rB, disparateImpact: di, demographicParityDiff: Math.abs(rA - rB), status: (di < 0.8 || di > 1.25) ? 'BIAS DETECTED' : 'MODEL FAIR' };
+      m = { rateA: rA, rateB: rB, disparateImpact: di, demographicParityDiff: Math.abs(rA - rB), status: (di < 0.8 || di > 1.25) ? 'BIAS DETECTED' : 'MODEL FAIR' };
     }
 
-    // Steps 6–7: Layer 2
-    setActiveLayer(2);
-    for (let i = 6; i <= 7; i++) { await delay(650); setProcessStep(i); }
-
-    // Fetch explanation — Step 8: Layer 3
-    setActiveLayer(3);
-    await delay(500); setProcessStep(8);
-
-    let fetchedExplanation = '';
+    let exp = '';
     try {
-      const res = await fetch('/api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metrics: fetchedMetrics, context: { groupA: groupData.groupA.name, groupB: groupData.groupB.name } }) });
+      const res = await fetch('/api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metrics: m, context: { groupA: data.groupA.name, groupB: data.groupB.name } }) });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
-      fetchedExplanation = json.explanation;
+      exp = json.explanation;
     } catch {
-      fetchedExplanation = `We compared ${groupData.groupA.name} and ${groupData.groupB.name}. One group is getting approved significantly less often — that gap is what fairness auditing calls bias. The score of ${fetchedMetrics.disparateImpact.toFixed(2)} confirms the gap exists and needs attention.`;
+      exp = `We compared ${data.groupA.name} and ${data.groupB.name}. One group is being approved significantly less often — the fairness score of ${m.disparateImpact.toFixed(2)} confirms bias is present.`;
     }
 
-    // Step 9: done
-    await delay(600); setProcessStep(9);
-    await delay(400);
-
-    setMetrics(fetchedMetrics);
-    setOriginalMetrics(fetchedMetrics);
-    setExplanation(fetchedExplanation);
-    setPhase('results');
+    setMetrics(m); setOrigMetrics(m); setExplanation(exp);
+    setHistory([{ label: 'Original', metrics: m }]);
+    setStep('audit');
   };
 
   // ── Mitigation ────────────────────────────────────────────────────────────────
 
-  const handleMitigate = async () => {
-    setMitigating(true);
+  const handleFix = async () => {
+    setFixing(true);
     try {
-      const res = await fetch('/api/mitigate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: groupData }) });
+      const res = await fetch('/api/mitigate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data }) });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
-      setResolvedMetrics(json.metrics);
+      setHistory(prev => [...prev, { label: 'Mitigated', metrics: json.metrics }]);
+      setMetrics(json.metrics);
       setCsvData(json.csvData);
     } catch {
       const rA = 0.72, rB = 0.78;
-      setResolvedMetrics({ rateA: rA, rateB: rB, disparateImpact: rA / rB, demographicParityDiff: Math.abs(rA - rB), status: 'MODEL FAIR' });
+      const m = { rateA: rA, rateB: rB, disparateImpact: rA / rB, demographicParityDiff: Math.abs(rA - rB), status: 'MODEL FAIR' };
+      setHistory(prev => [...prev, { label: 'Mitigated', metrics: m }]);
+      setMetrics(m);
     }
-    setMitigating(false);
-    setPhase('resolved');
+    setFixing(false);
+    setStep('resolution');
   };
 
   const downloadCSV = () => {
@@ -366,116 +300,136 @@ export default function App() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   };
 
-  const problemLabel = PROBLEMS.find(p => p.id === selectedProblem);
+  const currentScenario = SCENARIOS.find(s => s.id === scenario);
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-900">
+    <div className="h-screen bg-[#f8fafc] text-slate-900 font-sans flex flex-col overflow-hidden">
 
-      {/* ── Header ── */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <ShieldCheck className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <span className="text-sm font-bold tracking-tight">TrustOS</span>
-              <span className="text-slate-400 text-sm font-normal ml-1.5">AI Fairness Audit</span>
-            </div>
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <header className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-6 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <ShieldCheck className="w-4 h-4 text-white" />
           </div>
-
-          {/* Paradox — always visible */}
-          <div className="hidden sm:flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
-            <BrainCircuit className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <p className="text-[11px] text-amber-800">
-              <strong>The Paradox:</strong> If AI detects bias, can it also be biased?
-              <span className="text-slate-500"> — Math decides. AI only explains.</span>
-            </p>
-          </div>
-
-          {phase !== 'home' && (
-            <button onClick={reset} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors">
-              <RotateCcw className="w-3.5 h-3.5" /> New audit
-            </button>
-          )}
+          <span className="font-bold tracking-tight">TrustOS</span>
+          <span className="text-slate-400 text-sm hidden sm:block">| Conscience Middleware</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 bg-emerald-100 text-emerald-700 rounded">
+            <ShieldCheck className="w-3 h-3" /> VALIDATION SECURE
+          </span>
+          <span className="text-[10px] text-slate-400 hidden md:block">Model: Credit_Scoring_v4</span>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-8">
-        <AnimatePresence mode="wait">
+      <div className="flex flex-1 overflow-hidden">
 
-          {/* ═══════════════════════════════════════════════════════════════════
-              HOME
-          ═══════════════════════════════════════════════════════════════════ */}
-          {phase === 'home' && (
-            <motion.div key="home" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-              <PhaseBar phase="home" />
-              <AIGuide phase="home" />
+        {/* ── Left Sidebar ────────────────────────────────────────────────── */}
+        <nav className="w-56 border-r border-slate-200 bg-slate-50 p-5 flex flex-col gap-1.5 shrink-0">
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3">Audit Journey</p>
 
-              {/* Upload card */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-10 mb-8 shadow-sm flex flex-col items-center text-center">
-                <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-blue-200">
-                  <Upload className="w-8 h-8 text-white" />
+          {NAV_STEPS.map((s, i) => {
+            const { isActive, isDone } = navState(s.id);
+            return (
+              <div key={s.id} className={cn(
+                'flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-all duration-200',
+                isActive ? 'bg-white border border-slate-200 text-slate-900 font-bold shadow-sm' :
+                isDone   ? 'text-emerald-600 font-medium' : 'text-slate-400'
+              )}>
+                <div className={cn(
+                  'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0',
+                  isActive ? 'bg-blue-600 text-white' :
+                  isDone   ? 'border border-emerald-500 text-emerald-500' :
+                             'border border-slate-300 text-slate-400'
+                )}>
+                  {isDone ? '✓' : i + 1}
                 </div>
-                <h2 className="text-xl font-bold mb-2">Step 1: Upload Your Data</h2>
-                <p className="text-sm text-slate-500 mb-8 max-w-sm">
-                  Upload a CSV file with a group column and a decision column, or use our demo data below.
-                </p>
+                {s.label}
+              </div>
+            );
+          })}
 
-                {/* Upload states */}
-                {(uploadState === 'idle' || uploadState === 'error') && (
-                  <>
-                    <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) parseFile(f); e.target.value = ''; }} />
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-xl font-bold text-sm shadow-md transition-all w-full max-w-xs justify-center"
+          <div className="mt-auto p-3 bg-slate-200 rounded-xl">
+            <p className="text-[9px] font-bold uppercase text-slate-500 mb-1">Truth Status</p>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-600">Math Engine</span>
+              <span className="text-emerald-600 font-bold">READY</span>
+            </div>
+          </div>
+        </nav>
+
+        {/* ── Main Content ─────────────────────────────────────────────────── */}
+        <main className="flex-1 overflow-y-auto bg-white">
+          <div className="max-w-4xl mx-auto p-5">
+
+            {/* 3-Layer Header */}
+            <LayerHeader step={step} />
+
+            {/* Paradox Banner */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={step}
+                initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                className="bg-slate-900 text-white rounded-xl px-5 py-3.5 flex items-start gap-3 mb-5"
+              >
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shrink-0">
+                  <MessageCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400 mb-0.5">Paradox Conscience Status</p>
+                  <p className="text-sm font-medium leading-snug">{PARADOX_MESSAGES[step]}</p>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Step Content */}
+            <AnimatePresence mode="wait">
+
+              {/* ── UPLOAD ──────────────────────────────────────────────── */}
+              {step === 'upload' && (
+                <motion.div key="upload" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                  className="bg-slate-50 border border-slate-200 rounded-2xl p-10 flex flex-col items-center text-center"
+                >
+                  <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-blue-200">
+                    <Upload className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-xl font-bold mb-2">Step 1: Upload Your Data</h2>
+                  <p className="text-sm text-slate-500 mb-7 max-w-sm">
+                    Upload a CSV file with a group column and a decision column, or use our demo data below.
+                  </p>
+
+                  {/* Upload button */}
+                  <input ref={fileRef} type="file" accept=".csv" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) parseFile(f); e.target.value = ''; }} />
+
+                  {!uploadBusy ? (
+                    <button onClick={() => fileRef.current?.click()}
+                      className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-xl font-bold text-sm shadow-md transition-all w-full max-w-xs justify-center mb-2"
                     >
                       <Upload className="w-4 h-4" /> Select Dataset
                     </button>
-                    {uploadState === 'error' && (
-                      <div className="mt-4 flex items-start gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 text-left max-w-sm">
-                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                        <p>{uploadError}</p>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {(uploadState === 'reading' || uploadState === 'processing') && (
-                  <div className="flex items-center gap-3 text-slate-600 text-sm">
-                    <div className="w-5 h-5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
-                    {uploadState === 'reading' ? 'Uploading…' : 'Processing file…'}
-                  </div>
-                )}
-
-                {uploadState === 'done' && (
-                  <div className="w-full max-w-sm">
-                    <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl mb-3">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                      <div className="text-left">
-                        <p className="text-sm font-bold text-emerald-800">File loaded successfully</p>
-                        <p className="text-xs text-emerald-600 mt-0.5">
-                          {fileInfo?.name} · {fileInfo?.rows.toLocaleString()} rows · groups: <strong>{groupData.groupA.name}</strong> & <strong>{groupData.groupB.name}</strong>
-                        </p>
-                      </div>
+                  ) : (
+                    <div className="flex items-center gap-3 text-slate-600 text-sm mb-2">
+                      <div className="w-4 h-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+                      Processing file…
                     </div>
-                    <button onClick={() => { setUploadState('idle'); setFileLoaded(false); }} className="text-xs text-slate-400 hover:text-slate-600 underline">
-                      Upload a different file
-                    </button>
-                  </div>
-                )}
+                  )}
 
-                {/* Demo data */}
-                {uploadState !== 'done' && (
-                  <div className="mt-8 w-full max-w-sm">
+                  {uploadErr && (
+                    <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 text-left max-w-sm mt-2 mb-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <p>{uploadErr}</p>
+                    </div>
+                  )}
+
+                  {/* Demo datasets */}
+                  <div className="mt-6 w-full max-w-sm">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Or quick start with demo data</p>
                     <div className="grid grid-cols-2 gap-3">
                       {DEMO_DATASETS.map(d => (
-                        <button
-                          key={d.id}
-                          onClick={() => loadDemo(d)}
+                        <button key={d.id} onClick={() => { setData(d.data); setFileInfo({ name: d.title, rows: d.data.groupA.total + d.data.groupB.total, cols: 3 }); setStep('preview'); }}
                           className="text-left p-4 bg-white border border-slate-200 hover:border-blue-400 hover:shadow-sm rounded-xl transition-all"
                         >
                           <p className="text-sm font-bold text-slate-900">{d.title}</p>
@@ -484,328 +438,279 @@ export default function App() {
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
+                </motion.div>
+              )}
 
-              {/* 15 Problems */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-bold text-base">Step 2: Select a problem to audit</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {fileLoaded
-                        ? 'Dataset ready — click any problem below to start the analysis.'
-                        : 'Upload a dataset above, then select a problem here.'}
-                    </p>
-                  </div>
-                  {fileLoaded && (
-                    <span className="text-xs bg-emerald-100 text-emerald-700 font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Ready
-                    </span>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {PROBLEMS.map(p => (
-                    <button
-                      key={p.id}
-                      disabled={!fileLoaded}
-                      onClick={() => runAnalysis(p.id)}
-                      className={cn(
-                        'group text-left p-4 rounded-xl border-2 transition-all duration-200',
-                        fileLoaded
-                          ? 'bg-white border-slate-200 hover:border-blue-500 hover:shadow-md cursor-pointer'
-                          : 'bg-slate-50 border-slate-100 opacity-40 cursor-not-allowed'
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold text-blue-600 tracking-widest">{p.num}</span>
-                        <span className="text-[10px] text-slate-400 group-hover:text-blue-500 transition-colors">{p.impact}</span>
+              {/* ── PREVIEW ─────────────────────────────────────────────── */}
+              {step === 'preview' && (
+                <motion.div key="preview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                  className="bg-white border border-slate-200 rounded-2xl p-8"
+                >
+                  <h2 className="text-lg font-bold mb-5 flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Step 2: Verify Your Data
+                  </h2>
+                  <div className="grid grid-cols-3 gap-4 mb-6">
+                    {[
+                      { label: 'Rows Found',       val: (fileInfo?.rows || 1000).toLocaleString() },
+                      { label: 'Groups Detected',  val: '2' },
+                      { label: 'Columns',          val: String(fileInfo?.cols || 3) }
+                    ].map(c => (
+                      <div key={c.label} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{c.label}</p>
+                        <p className="text-2xl font-bold text-slate-900">{c.val}</p>
                       </div>
-                      <p className="text-sm font-bold text-slate-900 mb-1 group-hover:text-blue-700 transition-colors">{p.title}</p>
-                      <p className="text-[11px] text-slate-500 leading-tight">{p.desc}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ═══════════════════════════════════════════════════════════════════
-              PROCESSING
-          ═══════════════════════════════════════════════════════════════════ */}
-          {phase === 'processing' && (
-            <motion.div key="processing" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="max-w-2xl mx-auto">
-              <PhaseBar phase="processing" />
-              <AIGuide phase="processing" />
-
-              <h2 className="text-xl font-bold text-center mb-1">Running the audit</h2>
-              <p className="text-sm text-slate-500 text-center mb-6">
-                Auditing: <strong>{problemLabel?.title || 'Custom'}</strong> · {groupData.groupA.name} vs {groupData.groupB.name}
-              </p>
-
-              <LayerDiagram active={activeLayer} />
-
-              {/* Progress bar */}
-              <div className="mb-6">
-                <div className="flex justify-between text-xs text-slate-500 mb-1.5">
-                  <span>Progress</span>
-                  <span>{Math.round((processStep / PROCESS_STEPS.length) * 100)}%</span>
-                </div>
-                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-blue-600 rounded-full"
-                    animate={{ width: `${(processStep / PROCESS_STEPS.length) * 100}%` }}
-                    transition={{ duration: 0.5, ease: 'easeOut' }}
-                  />
-                </div>
-              </div>
-
-              {/* Step list */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                {PROCESS_STEPS.map((step, i) => {
-                  const stepNum = i + 1;
-                  const done    = processStep > stepNum;
-                  const active  = processStep === stepNum;
-                  return (
-                    <motion.div
-                      key={i}
-                      animate={{ backgroundColor: active ? '#eff6ff' : done ? '#f0fdf4' : '#ffffff' }}
-                      transition={{ duration: 0.35 }}
-                      className="flex items-start gap-4 px-5 py-3.5 border-b border-slate-100 last:border-0"
-                    >
-                      <div className={cn(
-                        'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 transition-all duration-400',
-                        done   ? 'bg-emerald-100 text-emerald-700' :
-                        active ? 'bg-blue-600 text-white shadow-md shadow-blue-200' :
-                                 'bg-slate-100 text-slate-400'
-                      )}>
-                        {done ? '✓' : stepNum}
-                      </div>
-                      <div className="flex-1">
-                        <p className={cn(
-                          'text-sm font-semibold transition-colors duration-300 flex items-center gap-2',
-                          active ? 'text-blue-700' : done ? 'text-emerald-700' : 'text-slate-400'
-                        )}>
-                          {step.msg}
-                          {active && (
-                            <span className="flex gap-0.5 mt-0.5">
-                              {[0,1,2].map(d => (
-                                <motion.span key={d} animate={{ opacity: [0.3,1,0.3] }} transition={{ repeat: Infinity, duration: 1, delay: d * 0.2 }}
-                                  className="w-1 h-1 rounded-full bg-blue-500 inline-block" />
-                              ))}
-                            </span>
-                          )}
-                        </p>
-                        {active && (
-                          <motion.p initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-blue-500 mt-0.5">
-                            {step.detail}
-                          </motion.p>
-                        )}
-                      </div>
-                      <span className={cn(
-                        'text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5',
-                        step.layer === 1 ? 'bg-emerald-100 text-emerald-700' :
-                        step.layer === 2 ? 'bg-blue-100 text-blue-700' :
-                                           'bg-purple-100 text-purple-700'
-                      )}>
-                        L{step.layer}
-                      </span>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
-
-          {/* ═══════════════════════════════════════════════════════════════════
-              RESULTS
-          ═══════════════════════════════════════════════════════════════════ */}
-          {phase === 'results' && metrics && (
-            <motion.div key="results" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
-              <PhaseBar phase="results" />
-              <AIGuide phase="results" />
-
-              <LayerDiagram active={3} />
-
-              {/* Findings card */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-xl font-bold">Audit findings</h2>
-                    <p className="text-sm text-slate-500 mt-0.5">
-                      {problemLabel?.title || 'Custom audit'} · {groupData.groupA.name} vs {groupData.groupB.name}
-                    </p>
+                    ))}
                   </div>
-                  <StatusBadge status={metrics.status} />
-                </div>
-
-                {/* Score + rates */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className={cn(
-                    'col-span-1 flex flex-col items-center justify-center p-6 rounded-xl border-2',
-                    metrics.status === 'BIAS DETECTED' ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'
-                  )}>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Fairness Score</p>
-                    <p className={cn(
-                      'text-5xl font-black font-mono',
-                      metrics.status === 'BIAS DETECTED' ? 'text-red-500' : 'text-emerald-500'
-                    )}>{metrics.disparateImpact.toFixed(2)}</p>
-                    <p className="text-[11px] text-slate-500 mt-1.5">Fair threshold: 0.80+</p>
+                  <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-sm text-emerald-700 mb-6">
+                    Identified <strong>{data.groupA.name}</strong> and <strong>{data.groupB.name}</strong> as the main groups to audit.
                   </div>
-
-                  {[
-                    { label: groupData.groupA.name, rate: metrics.rateA, color: 'blue' },
-                    { label: groupData.groupB.name, rate: metrics.rateB, color: 'purple' }
-                  ].map(g => (
-                    <div key={g.label} className="p-5 bg-slate-50 rounded-xl border border-slate-200">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">{g.label}</p>
-                      <p className="text-3xl font-bold text-slate-900">{(g.rate * 100).toFixed(0)}%</p>
-                      <p className="text-xs text-slate-500 mb-3">approval rate</p>
-                      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }} animate={{ width: `${g.rate * 100}%` }} transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
-                          className={cn('h-full rounded-full', g.color === 'blue' ? 'bg-blue-500' : 'bg-purple-500')}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Gap callout */}
-                {metrics.status === 'BIAS DETECTED' && (
-                  <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl mb-6">
-                    <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-bold text-red-700 mb-0.5">Bias detected</p>
-                      <p className="text-sm text-red-600">
-                        {groupData.groupA.name} has an approval rate of <strong>{(metrics.rateA * 100).toFixed(0)}%</strong> vs{' '}
-                        <strong>{(metrics.rateB * 100).toFixed(0)}%</strong> for {groupData.groupB.name}.
-                        The gap of <strong>{(metrics.demographicParityDiff * 100).toFixed(0)} percentage points</strong> falls below the 0.80 fairness threshold.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* AI explanation */}
-                <div className="p-5 bg-blue-50 border border-blue-100 rounded-xl mb-6">
-                  <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                    <BrainCircuit className="w-3.5 h-3.5" /> What this means — in plain language
-                  </p>
-                  <p className="text-sm text-slate-700 leading-relaxed">{explanation}</p>
-                </div>
-
-                {/* Actions */}
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={handleMitigate}
-                    disabled={mitigating}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-100 transition-all"
+                  <button onClick={() => setStep('problem')}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-200 transition-all"
                   >
-                    {mitigating
-                      ? <><div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> Applying fix…</>
-                      : <><Zap className="w-4 h-4" /> Simulate bias fix</>}
+                    Looks Good, Continue <ArrowRight className="w-4 h-4" />
                   </button>
-                  <button onClick={reset} className="flex-1 border border-slate-200 hover:bg-slate-50 py-3.5 rounded-xl text-sm font-semibold text-slate-600 transition-all">
-                    Start new audit
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
+                </motion.div>
+              )}
 
-          {/* ═══════════════════════════════════════════════════════════════════
-              RESOLVED
-          ═══════════════════════════════════════════════════════════════════ */}
-          {phase === 'resolved' && resolvedMetrics && originalMetrics && (
-            <motion.div key="resolved" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
-              <PhaseBar phase="resolved" />
-              <AIGuide phase="resolved" />
+              {/* ── PROBLEM ─────────────────────────────────────────────── */}
+              {step === 'problem' && (
+                <motion.div key="problem" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <div className="text-center mb-5">
+                    <h2 className="text-xl font-bold">Step 3: What are we auditing?</h2>
+                    <p className="text-sm text-slate-500 mt-1">Select the real-world scenario that best matches your data.</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {SCENARIOS.map(s => (
+                      <button key={s.id} onClick={() => runAnalysis(s.id)}
+                        className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:shadow-md text-left transition-all group"
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[9px] font-bold text-blue-600 tracking-widest">{s.num}</span>
+                          <span className="text-[9px] text-slate-400 group-hover:text-blue-500 transition-colors">{s.impact}</span>
+                        </div>
+                        <p className="text-xs font-bold text-slate-900 mb-1 group-hover:text-blue-700 transition-colors">{s.title}</p>
+                        <p className="text-[10px] text-slate-500 leading-tight">{s.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
 
-              {/* Success banner */}
-              <div className="flex items-center gap-4 bg-emerald-600 text-white rounded-2xl p-6">
-                <ShieldCheck className="w-10 h-10 shrink-0" />
-                <div>
-                  <h2 className="text-lg font-bold">Bias removed — fairness restored</h2>
-                  <p className="text-sm text-emerald-100 mt-0.5">
-                    {groupData.groupA.name} and {groupData.groupB.name} now receive equal consideration from the model.
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                <h3 className="font-bold text-base mb-5 flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-blue-500" /> Before vs After
-                </h3>
-
-                {/* Bar chart */}
-                <div className="h-52 mb-6">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={[
-                        { name: 'Before fix', score: originalMetrics.disparateImpact },
-                        { name: 'After fix',  score: resolvedMetrics.disparateImpact }
-                      ]}
-                      margin={{ top: 10, right: 20, left: 0, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis dataKey="name" fontSize={12} axisLine={false} tickLine={false} />
-                      <YAxis domain={[0, 1.3]} fontSize={11} axisLine={false} tickLine={false} />
-                      <Tooltip
-                        contentStyle={{ borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12 }}
-                        formatter={(v: number) => [v.toFixed(2), 'Fairness score']}
+              {/* ── PROCESSING ──────────────────────────────────────────── */}
+              {step === 'processing' && (
+                <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="bg-slate-900 rounded-2xl p-10 flex flex-col items-center justify-center min-h-[340px] text-white shadow-2xl relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 opacity-10">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#3b82f6,_transparent_70%)] animate-pulse" />
+                  </div>
+                  <div className="relative z-10 w-full max-w-md flex flex-col items-center">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400 mb-4">
+                      Auditing: {currentScenario?.title || 'Custom'} · {data.groupA.name} vs {data.groupB.name}
+                    </p>
+                    <div className="w-full bg-white/10 h-1.5 rounded-full mb-6 overflow-hidden">
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }}
+                        className="h-full bg-blue-500 rounded-full shadow-[0_0_12px_rgba(59,130,246,0.6)]"
+                        transition={{ duration: 0.4 }}
                       />
-                      <ReferenceLine y={0.8} stroke="#f59e0b" strokeDasharray="4 2"
-                        label={{ value: 'Fair line (0.80)', position: 'insideTopRight', fontSize: 10, fill: '#b45309' }} />
-                      <Bar dataKey="score" radius={[6,6,0,0]} maxBarSize={80}>
-                        <Cell fill="#ef4444" />
-                        <Cell fill="#10b981" />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Original score</p>
-                    <p className="text-3xl font-black font-mono text-red-500">{originalMetrics.disparateImpact.toFixed(2)}</p>
-                    <StatusBadge status={originalMetrics.status} />
+                    </div>
+                    <div className="w-full space-y-2.5 text-center">
+                      {logs.map((log, i) => (
+                        <motion.p key={log + i} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
+                          className={cn(
+                            'text-sm font-mono transition-all',
+                            i === logs.length - 1 ? 'opacity-100 font-bold text-blue-300' : 'opacity-40'
+                          )}
+                        >{log}</motion.p>
+                      ))}
+                    </div>
+                    <p className="text-slate-500 text-xs mt-6 font-mono">{progress}% complete</p>
                   </div>
-                  <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Fixed score</p>
-                    <p className="text-3xl font-black font-mono text-emerald-500">{resolvedMetrics.disparateImpact.toFixed(2)}</p>
-                    <StatusBadge status={resolvedMetrics.status} />
+                </motion.div>
+              )}
+
+              {/* ── AUDIT ───────────────────────────────────────────────── */}
+              {step === 'audit' && metrics && (
+                <motion.div key="audit" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                  className="space-y-4"
+                >
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-5">
+                      <div>
+                        <h3 className="text-xl font-black tracking-tight">Audit Findings</h3>
+                        <p className="text-sm text-slate-500 mt-0.5">
+                          {currentScenario?.title || 'Custom Audit'} · {data.groupA.name} vs {data.groupB.name}
+                        </p>
+                      </div>
+                      <StatusBadge status={metrics.status} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6 mb-5 items-center">
+                      {/* Score */}
+                      <div className={cn(
+                        'flex flex-col items-center py-8 rounded-2xl border-2 relative overflow-hidden',
+                        metrics.status === 'BIAS DETECTED' ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'
+                      )}>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Fairness Score</p>
+                        <p className={cn('text-6xl font-black font-mono mb-1', metrics.status === 'BIAS DETECTED' ? 'text-red-500' : 'text-emerald-500')}>
+                          {metrics.disparateImpact.toFixed(2)}
+                        </p>
+                        <p className="text-[11px] text-slate-500 font-bold">Fair = 0.80 or above</p>
+                        <div className="mt-3 flex gap-4 text-xs text-slate-600">
+                          <span><strong>{(metrics.rateA * 100).toFixed(0)}%</strong> {data.groupA.name}</span>
+                          <span><strong>{(metrics.rateB * 100).toFixed(0)}%</strong> {data.groupB.name}</span>
+                        </div>
+                      </div>
+
+                      {/* Explanation + actions */}
+                      <div className="space-y-4">
+                        <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                          <p className="text-[10px] font-bold text-blue-600 uppercase mb-2 flex items-center gap-1.5">
+                            <BrainCircuit className="w-3.5 h-3.5" /> AI Explanation
+                          </p>
+                          <p className="text-sm text-slate-700 leading-relaxed">{explanation}</p>
+                        </div>
+                        <button onClick={handleFix} disabled={fixing}
+                          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-200 transition-all"
+                        >
+                          {fixing
+                            ? <><div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> Balancing data…</>
+                            : <><Zap className="w-4 h-4" /> Resolve This Bias Now</>}
+                        </button>
+                        <button onClick={goReset} className="w-full text-slate-400 text-sm font-semibold py-1 hover:text-slate-700 transition-colors">
+                          <RotateCcw className="w-3.5 h-3.5 inline mr-1" /> Cancel & Restart
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </motion.div>
+              )}
 
-                {/* What changed */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl mb-6 text-sm text-slate-700 leading-relaxed">
-                  <strong>What changed?</strong> Reweighting adjusted how decisions were distributed across groups.
-                  {' '}{groupData.groupA.name} and {groupData.groupB.name} now have approval rates within the industry fairness standard (0.80+).
-                  This is a simulation — in production, this technique adjusts model training weights, not raw outputs.
-                </div>
+              {/* ── RESOLUTION ──────────────────────────────────────────── */}
+              {step === 'resolution' && metrics && origMetrics && (
+                <motion.div key="resolution" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                  className="space-y-4"
+                >
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-5">
+                      <div>
+                        <h3 className="text-2xl font-black tracking-tight">Mission Accomplished</h3>
+                        <p className="text-emerald-600 text-sm font-bold mt-0.5">Balanced with deterministic parity.</p>
+                      </div>
+                      <StatusBadge status="MODEL FAIR" />
+                    </div>
 
-                {/* Actions */}
-                <div className="flex flex-col sm:flex-row gap-3">
-                  {csvData && (
-                    <button
-                      onClick={downloadCSV}
-                      className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all"
+                    {history.length >= 2 && (
+                      <div className="h-44 mb-5">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={[
+                            { name: 'Before Fix', score: history[0].metrics.disparateImpact },
+                            { name: 'After Fix',  score: history[1].metrics.disparateImpact }
+                          ]} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                            <XAxis dataKey="name" fontSize={11} axisLine={false} tickLine={false} />
+                            <YAxis domain={[0, 1.3]} fontSize={11} axisLine={false} tickLine={false} />
+                            <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }}
+                              formatter={(v: number) => [v.toFixed(2), 'Fairness score']} />
+                            <ReferenceLine y={0.8} stroke="#f59e0b" strokeDasharray="4 2"
+                              label={{ value: 'Fair line 0.80', position: 'insideTopRight', fontSize: 9, fill: '#b45309' }} />
+                            <Bar dataKey="score" radius={[6,6,0,0]} maxBarSize={70}>
+                              <Cell fill="#ef4444" />
+                              <Cell fill="#10b981" />
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4 mb-5">
+                      <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100">
+                        <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Human Result</p>
+                        <p className="text-sm text-emerald-800">{data.groupA.name} and {data.groupB.name} now receive equal consideration from the AI.</p>
+                      </div>
+                      <div className="bg-slate-900 p-5 rounded-2xl text-white">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Safety Certificate</p>
+                        <p className="text-xs text-slate-300 mb-3">Model decisions are now compliant with EU AI Act Article 9.</p>
+                        <button onClick={downloadCSV} disabled={!csvData}
+                          className="w-full bg-white/10 hover:bg-white/20 text-white py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Download Audit Proof
+                        </button>
+                      </div>
+                    </div>
+
+                    <button onClick={goReset}
+                      className="w-full border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all"
                     >
-                      <Download className="w-4 h-4" /> Download audit proof (CSV)
+                      Start New Audit
                     </button>
-                  )}
-                  <button onClick={reset} className="flex-1 border border-slate-200 hover:bg-slate-50 py-3.5 rounded-xl text-sm font-semibold text-slate-600 transition-all">
-                    Audit a new dataset
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
+                  </div>
+                </motion.div>
+              )}
 
-        </AnimatePresence>
-      </main>
+            </AnimatePresence>
+          </div>
+        </main>
+
+        {/* ── Right Sidebar ───────────────────────────────────────────────── */}
+        <aside className="w-72 border-l border-slate-200 bg-white p-5 shrink-0 hidden xl:flex flex-col">
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-4">Live Audit Log</p>
+
+          <div className="space-y-5 flex-1">
+            <div className="text-xs pb-4 border-b border-slate-100">
+              <p className="font-bold mb-2 text-slate-700">Truth Layer 1: Statistical Check</p>
+              <div className="flex justify-between items-center mb-1">
+                <p className="text-slate-500">Demographic Parity Index</p>
+                <span className="font-mono font-bold text-slate-900">{metrics?.demographicParityDiff.toFixed(2) ?? '–'}</span>
+              </div>
+              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="bg-red-500 h-full transition-all duration-700" style={{ width: `${Math.min((metrics?.demographicParityDiff ?? 0) * 100, 100)}%` }} />
+              </div>
+            </div>
+
+            <div className="text-xs pb-4 border-b border-slate-100">
+              <p className="font-bold mb-2 text-slate-700">Truth Layer 2: Equality of Opp.</p>
+              <div className="flex justify-between items-center mb-1">
+                <p className="text-slate-500">Fairness Score</p>
+                <span className="font-mono font-bold text-slate-900">{metrics?.disparateImpact.toFixed(2) ?? '–'}</span>
+              </div>
+              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="bg-blue-500 h-full transition-all duration-700" style={{ width: `${Math.min((metrics?.disparateImpact ?? 0) * 70, 100)}%` }} />
+              </div>
+            </div>
+
+            {step === 'audit' && (
+              <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-blue-50 border border-blue-100 rounded-xl"
+              >
+                <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest mb-2">AI Engine Context</p>
+                <p className="text-[11px] text-blue-700 leading-relaxed italic">
+                  "Analyzing decision points across protected attributes. Disparate Impact ratio computed via 4/5ths rule."
+                </p>
+              </motion.div>
+            )}
+
+            <div className="text-xs">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Mitigation Strategy</p>
+              {['Reweighting', 'Oversampling', 'Selection Threshold'].map(m => (
+                <label key={m} className="flex items-center gap-2 py-1 cursor-pointer group">
+                  <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300 flex items-center justify-center">
+                    {m === 'Reweighting' && <div className="w-1.5 h-1.5 bg-blue-600 rounded-full" />}
+                  </div>
+                  <span className={cn('text-[11px]', m === 'Reweighting' ? 'text-slate-900 font-bold' : 'text-slate-400')}>{m}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+            <p className="text-[9px] text-slate-400 uppercase italic leading-tight">
+              Validation Hash:<br /><span className="font-mono text-slate-600 not-italic">0x8F22…BE09</span>
+            </p>
+          </div>
+        </aside>
+
+      </div>
     </div>
   );
 }

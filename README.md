@@ -58,9 +58,26 @@ before their AI impacts real people.
 
 ---
 
+## 🎬 See It In Action
+
+<div align="center">
+
+<br /><br />
+
+https://github.com/user-attachments/assets/58ead7ca-6dd9-4f0a-9253-5e06161ebf73
+
+<br />
+
+> 🔍 **Detect** hidden bias → 🧠 **Understand** it in plain English → ✅ **Fix** it with one click
+
+</div>
+
+---
+
 ## 🏗️ The 3-Layer Architecture
 
-The entire system is built on a tiered structure that ensures mathematical accuracy, human readability, and regulatory compliance — in that order.
+The system runs in 3 steps — **detect**, **explain**, **fix** — in that exact order.
+
 
 ```
 [ Raw Dataset ]
@@ -245,14 +262,13 @@ npm run deploy
 
 ---
 
-## ✅ Regulatory Alignment
+## ✅ Legally Recognized Standards
 
-| Standard | Coverage |
+| Law | Simply Put |
 |---|---|
-| **EU AI Act — Article 9** | Risk management and bias mitigation for high-risk AI systems |
-| **US EEOC — 80% Rule** | Disparate impact standard for hiring and employment decisions |
-| **GDPR — Right to Explanation** | Citizen audit scenario ensures explainability compliance |
-
+| **EU AI Act** | Europe requires AI to be provably fair. TrustOS generates that proof. |
+| **US EEOC 80% Rule** | If AI rejects minorities 20% more — it's illegal. TrustOS catches that. |
+| **GDPR** | People have the right to know why AI rejected them. TrustOS explains it. |
 ---
 
 ## 📁 Project Structure
@@ -279,12 +295,6 @@ paradox-conscience/
 - **Browser-side processing** — Large datasets (100k+ rows) are processed locally, never uploaded to a server
 - **No-code interface** — Built for lawyers, HR leads, and policy makers — not just data scientists
 - **Separation of concerns** — Detection and explanation are architecturally isolated by design
-
----
-
-## 📄 License
-
-MIT License — see [LICENSE](./LICENSE) for details.
 
 ---
 

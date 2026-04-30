@@ -169,14 +169,15 @@ function LayerConnector({ filled, color }: { filled: boolean; color: 'emerald' |
 function LayerHeader({ step }: { step: Step }) {
   const l1Active = step === 'processing';
   const l2Active = step === 'audit';
-  const l3Active = step === 'resolution';
+  const l3Active = false;
   const l1Done   = ['audit', 'resolution'].includes(step);
   const l2Done   = step === 'resolution';
+  const l3Done   = step === 'resolution';
 
   const layers = [
-    { key: 'l1', num: '1', label: 'Math Engine',  sub: 'Detects bias with math only.', active: l1Active, done: l1Done, color: 'emerald' as const },
-    { key: 'l2', num: '2', label: 'AI Explainer', sub: 'Translates results to language.', active: l2Active, done: l2Done, color: 'blue' as const },
-    { key: 'l3', num: '3', label: 'Parity Lock',  sub: 'Applies fix & certifies.', active: l3Active, done: l3Active, color: 'purple' as const }
+    { key: 'l1', num: '1', label: 'Math Engine',  sub: 'Detects bias with math only.',          active: l1Active, done: l1Done, color: 'emerald' as const },
+    { key: 'l2', num: '2', label: 'AI Explainer', sub: 'Translates results to language.',        active: l2Active, done: l2Done, color: 'blue'    as const },
+    { key: 'l3', num: '3', label: 'Final Check',  sub: 'Confirms everything is consistent.',     active: l3Active, done: l3Done, color: 'emerald' as const }
   ];
 
   const cardStyle = (l: typeof layers[0]) => {
@@ -185,8 +186,8 @@ function LayerHeader({ step }: { step: Step }) {
       blue:    'bg-blue-50 border-blue-300 ring-2 ring-blue-400/20',
       purple:  'bg-purple-50 border-purple-300 ring-2 ring-purple-400/20'
     })[l.color];
-    if (l.done) return 'bg-slate-50 border-emerald-200';
-    return 'bg-slate-50 border-slate-100 opacity-40';
+    if (l.done) return 'bg-white border-emerald-200 shadow-sm';
+    return 'bg-white border-slate-200 opacity-40';
   };
 
   const labelStyle = (l: typeof layers[0]) => {
@@ -552,7 +553,7 @@ export default function App() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-screen bg-[#f8fafc] text-slate-900 font-sans flex flex-col overflow-hidden">
+    <div className="h-screen bg-slate-50 text-slate-900 font-sans flex flex-col overflow-hidden">
 
       {/* ── Modal Overlay ──────────────────────────────────────────────────── */}
       <AnimatePresence>
@@ -575,26 +576,25 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-6 shrink-0">
+      <header className="h-14 border-b border-slate-200/80 bg-white/95 backdrop-blur-sm flex items-center justify-between px-6 shrink-0 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow-md shadow-blue-200">
             <ShieldCheck className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold tracking-tight">TrustOS</span>
-          <span className="text-slate-300 hidden sm:block">|</span>
-          <span className="text-slate-500 text-sm hidden sm:block">AI Fairness Audit</span>
+          <div className="flex items-center gap-2">
+            <span className="font-black tracking-tight text-slate-900">TrustOS</span>
+            <span className="hidden sm:block text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md">AI Fairness Audit</span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setModal('engine')}
-            className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full hover:bg-emerald-100 transition-colors cursor-pointer"
+          <button onClick={() => setModal('engine')}
+            className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full hover:bg-emerald-100 active:scale-95 transition-all"
           >
             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
             Math Engine Active
           </button>
-          <button
-            onClick={() => setModal('scenarios')}
-            className="hidden md:flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full hover:bg-blue-100 transition-colors cursor-pointer"
+          <button onClick={() => setModal('scenarios')}
+            className="hidden md:flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full hover:bg-indigo-100 active:scale-95 transition-all"
           >
             15 Problem Scenarios
           </button>
@@ -604,7 +604,7 @@ export default function App() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left Sidebar ────────────────────────────────────────────────── */}
-        <nav className="w-56 border-r border-slate-200 bg-slate-50 p-5 flex flex-col gap-1 shrink-0">
+        <nav className="w-56 border-r border-slate-200 bg-white p-5 flex flex-col gap-1 shrink-0">
           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3">Audit Journey</p>
 
           {NAV_STEPS.map((s, i) => {
@@ -650,24 +650,30 @@ export default function App() {
         </nav>
 
         {/* ── Main Content ─────────────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto bg-white">
+        <main className="flex-1 overflow-y-auto bg-slate-50">
           <div className="max-w-4xl mx-auto p-5">
 
             <LayerHeader step={step} />
-            <ParadoxBanner />
+            <AnimatePresence>
+              {step === 'upload' && (
+                <motion.div key="paradox" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }}>
+                  <ParadoxBanner />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <AnimatePresence mode="wait">
 
               {/* ── UPLOAD ────────────────────────────────────────────────── */}
               {step === 'upload' && (
                 <motion.div key="upload" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  className="bg-slate-50 border border-slate-200 rounded-2xl p-10 flex flex-col items-center text-center"
+                  className="bg-white border border-slate-200 rounded-2xl p-10 flex flex-col items-center text-center shadow-sm"
                 >
-                  <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-blue-200">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-blue-200">
                     <Upload className="w-8 h-8 text-white" />
                   </div>
-                  <h2 className="text-xl font-bold mb-1.5">Upload Your Decision Data</h2>
-                  <p className="text-sm text-slate-500 mb-7 max-w-xs">
+                  <h2 className="text-xl font-black mb-1.5 tracking-tight">Upload Your Decision Data</h2>
+                  <p className="text-sm text-slate-500 mb-7 max-w-xs leading-relaxed">
                     Any CSV with a group column and a decision column. The system audits across 15 real-world fairness scenarios.
                   </p>
 
@@ -676,7 +682,7 @@ export default function App() {
 
                   {!uploadBusy ? (
                     <button onClick={() => fileRef.current?.click()}
-                      className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-xl font-bold text-sm shadow-md transition-all w-full max-w-xs justify-center"
+                      className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 rounded-xl font-bold text-sm shadow-md shadow-blue-200 transition-all w-full max-w-xs justify-center active:scale-95"
                     >
                       <Upload className="w-4 h-4" /> Select CSV File
                     </button>
@@ -704,7 +710,7 @@ export default function App() {
                             setFileInfo({ name: d.title, rows: d.data.groupA.total + d.data.groupB.total, cols: 3, columnNames: [] });
                             setIsDemo(true); setSuggested(d.suggestedProblem); setStep('preview');
                           }}
-                          className="text-left p-4 bg-white border border-slate-200 hover:border-blue-400 hover:shadow-sm rounded-xl transition-all"
+                          className="text-left p-4 bg-slate-50 border border-slate-200 hover:border-blue-400 hover:bg-white hover:shadow-md rounded-xl transition-all active:scale-95"
                         >
                           <p className="text-sm font-bold text-slate-900">{d.title}</p>
                           <p className="text-[11px] text-slate-500 mt-0.5">{d.subtitle}</p>
@@ -831,9 +837,12 @@ export default function App() {
                           </div>
                           <p className="text-xs font-bold text-slate-900 mb-1 group-hover:text-blue-700 transition-colors">{s.title}</p>
                           <p className="text-[9px] text-slate-500 leading-tight mb-2">{s.desc}</p>
-                          <div className="flex items-center gap-1 pt-2 border-t border-slate-100">
-                            <ChevronRight className="w-2.5 h-2.5 text-blue-500 shrink-0" />
-                            <p className="text-[9px] font-semibold text-blue-600 leading-tight">{s.analyzes}</p>
+                          <div className="pt-2 border-t border-slate-100 space-y-0.5">
+                            <p className="text-[9px] text-slate-400">If you select this:</p>
+                            <div className="flex items-start gap-1">
+                              <ChevronRight className="w-2.5 h-2.5 text-blue-500 shrink-0 mt-0.5" />
+                              <p className="text-[9px] font-semibold text-blue-600 leading-tight">Analyze: {s.analyzes}</p>
+                            </div>
                           </div>
                         </button>
                       );
@@ -963,21 +972,17 @@ export default function App() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4 mb-5">
-                      <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100">
-                        <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Result</p>
-                        <p className="text-sm text-emerald-800">{data.groupA.name} and {data.groupB.name} now receive equal consideration.</p>
-                      </div>
-                      <div className="bg-slate-900 p-5 rounded-2xl text-white">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Certificate</p>
-                        <p className="text-xs text-slate-300 mb-3">Compliant with EU AI Act Article 9.</p>
-                        <button onClick={downloadCSV} disabled={!csvData}
-                          className="w-full bg-white/10 hover:bg-white/20 text-white py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-40"
-                        >
-                          <Download className="w-3.5 h-3.5" /> Download Audit Proof
-                        </button>
-                      </div>
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-4">
+                      <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Result</p>
+                      <p className="text-sm text-emerald-800 mb-3">{data.groupA.name} and {data.groupB.name} now receive equal consideration from the AI.</p>
+                      <p className="text-[10px] text-emerald-600">Compliant with EU AI Act Article 9 · Audit certified</p>
                     </div>
+
+                    <button onClick={downloadCSV} disabled={!csvData}
+                      className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white py-3.5 rounded-xl font-bold text-sm transition-all mb-4 shadow-md shadow-emerald-200"
+                    >
+                      <Download className="w-4 h-4" /> Download Balanced Dataset
+                    </button>
 
                     <button onClick={goReset}
                       className="w-full border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all"
@@ -1025,18 +1030,6 @@ export default function App() {
                   transition={{ duration: 0.7 }}
                 />
               </div>
-            </div>
-
-            <div className="text-xs pb-4 border-b border-slate-100">
-              <p className="font-bold mb-2 text-slate-700">Step 3: Fix Method</p>
-              {['Reweighting', 'Oversampling', 'Threshold Adjustment'].map(m => (
-                <label key={m} className="flex items-center gap-2 py-1.5">
-                  <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300 flex items-center justify-center">
-                    {m === 'Reweighting' && <div className="w-1.5 h-1.5 bg-blue-600 rounded-full" />}
-                  </div>
-                  <span className={cn('text-[11px]', m === 'Reweighting' ? 'text-slate-900 font-bold' : 'text-slate-400')}>{m}</span>
-                </label>
-              ))}
             </div>
 
             {step === 'problem' && (

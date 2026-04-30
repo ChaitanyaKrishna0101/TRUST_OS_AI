@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   ShieldAlert, ShieldCheck, BrainCircuit, Calculator, Upload,
   ArrowRight, CheckCircle2, AlertCircle, Zap, Download,
-  RotateCcw, HelpCircle, Info
+  RotateCcw, HelpCircle, Info, X, ChevronRight
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -18,7 +18,8 @@ function cn(...inputs: ClassValue[]) {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Step = 'upload' | 'preview' | 'problem' | 'processing' | 'audit' | 'resolution';
+type Step  = 'upload' | 'preview' | 'problem' | 'processing' | 'audit' | 'resolution';
+type Modal = null | 'engine' | 'scenarios';
 
 interface FairnessMetrics {
   rateA: number; rateB: number;
@@ -27,34 +28,31 @@ interface FairnessMetrics {
 }
 
 // ─── Problem Mapping Engine ───────────────────────────────────────────────────
-// Each problem defines which columns it expects in a real dataset.
-// This lets the system interpret the same raw data differently per context.
 
 interface ProblemMapping {
-  sensitiveKeywords: string[];   // column name hints for the group/sensitive attribute
-  outcomeKeywords: string[];     // column name hints for the decision/outcome
-  explanation: string;           // shown to user explaining the context
+  sensitiveKeywords: string[];
+  outcomeKeywords: string[];
 }
 
 const PROBLEM_MAPPINGS: Record<string, ProblemMapping> = {
-  hiring:    { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],        outcomeKeywords: ['hired','selected','hire','decision','approved','result'],     explanation: 'Checks whether hiring decisions favour some demographic groups over others.' },
-  banking:   { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],        outcomeKeywords: ['approved','loan','credit','decision','result','outcome'],     explanation: 'Measures if loan approvals differ significantly by protected attribute.' },
-  health:    { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],        outcomeKeywords: ['treated','admitted','approved','access','outcome','result'],  explanation: 'Detects unequal access to medical treatment across patient groups.' },
-  edu:       { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],        outcomeKeywords: ['admitted','accepted','approved','admit','decision'],          explanation: 'Audits whether admissions algorithms disadvantage certain student groups.' },
-  justice:   { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],        outcomeKeywords: ['released','bail','parole','approved','decision','result'],    explanation: 'Evaluates fairness in bail and parole decisions across demographic groups.' },
-  insurance: { sensitiveKeywords: ['gender','sex','race','age','location','zip'],  outcomeKeywords: ['approved','rate','premium','decision','result'],              explanation: 'Identifies if insurance pricing unfairly burdens certain groups.' },
-  gov:       { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],        outcomeKeywords: ['approved','benefit','welfare','decision','result'],           explanation: 'Checks whether government benefit systems distribute help equitably.' },
-  social:    { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],        outcomeKeywords: ['removed','banned','flagged','moderated','approved'],         explanation: 'Audits content moderation for patterns of unfair censorship.' },
-  commerce:  { sensitiveKeywords: ['gender','sex','race','age','location'],         outcomeKeywords: ['shown','targeted','approved','decision','result'],            explanation: 'Measures whether ad targeting and pricing differs across groups.' },
-  housing:   { sensitiveKeywords: ['gender','sex','race','ethnicity','location'],   outcomeKeywords: ['approved','valued','rented','sold','decision','result'],      explanation: 'Detects algorithmic discrimination in housing and property valuation.' },
-  police:    { sensitiveKeywords: ['gender','sex','race','ethnicity','age','location'], outcomeKeywords: ['stopped','arrested','searched','flagged','decision'],    explanation: 'Evaluates whether predictive policing tools target groups unfairly.' },
-  climate:   { sensitiveKeywords: ['income','location','race','age','ethnicity'],   outcomeKeywords: ['approved','subsidy','decision','result'],                    explanation: 'Checks if green energy subsidies reach all communities equally.' },
-  legal:     { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],        outcomeKeywords: ['compliant','approved','decision','result','outcome'],        explanation: 'Tests EU AI Act Article 9 compliance for protected attribute fairness.' },
-  sme:       { sensitiveKeywords: ['gender','sex','race','ethnicity','location'],   outcomeKeywords: ['approved','funded','loan','decision','result'],               explanation: 'Audits whether SME funding algorithms disadvantage certain founders.' },
-  citizen:   { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],        outcomeKeywords: ['approved','explained','decision','result','outcome'],        explanation: 'Ensures citizens receive equal AI decision-making treatment by law.' }
+  hiring:    { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],             outcomeKeywords: ['hired','selected','hire','decision','approved','result'] },
+  banking:   { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],             outcomeKeywords: ['approved','loan','credit','decision','result','outcome'] },
+  health:    { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],             outcomeKeywords: ['treated','admitted','approved','access','outcome','result'] },
+  edu:       { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],             outcomeKeywords: ['admitted','accepted','approved','admit','decision'] },
+  justice:   { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],             outcomeKeywords: ['released','bail','parole','approved','decision','result'] },
+  insurance: { sensitiveKeywords: ['gender','sex','race','age','location','zip'],       outcomeKeywords: ['approved','rate','premium','decision','result'] },
+  gov:       { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],             outcomeKeywords: ['approved','benefit','welfare','decision','result'] },
+  social:    { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],             outcomeKeywords: ['removed','banned','flagged','moderated','approved'] },
+  commerce:  { sensitiveKeywords: ['gender','sex','race','age','location'],              outcomeKeywords: ['shown','targeted','approved','decision','result'] },
+  housing:   { sensitiveKeywords: ['gender','sex','race','ethnicity','location'],        outcomeKeywords: ['approved','valued','rented','sold','decision','result'] },
+  police:    { sensitiveKeywords: ['gender','sex','race','ethnicity','age','location'],  outcomeKeywords: ['stopped','arrested','searched','flagged','decision'] },
+  climate:   { sensitiveKeywords: ['income','location','race','age','ethnicity'],        outcomeKeywords: ['approved','subsidy','decision','result'] },
+  legal:     { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],             outcomeKeywords: ['compliant','approved','decision','result','outcome'] },
+  sme:       { sensitiveKeywords: ['gender','sex','race','ethnicity','location'],        outcomeKeywords: ['approved','funded','loan','decision','result'] },
+  citizen:   { sensitiveKeywords: ['gender','sex','race','ethnicity','age'],             outcomeKeywords: ['approved','explained','decision','result','outcome'] }
 };
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
+// ─── Static Data ──────────────────────────────────────────────────────────────
 
 const INITIAL_DATA = {
   groupA: { name: 'Group A', total: 1000, approved: 400 },
@@ -75,77 +73,65 @@ const DEMO_DATASETS = [
 ];
 
 const SCENARIOS = [
-  { id: 'hiring',    num: '01', title: 'Hiring',           domain: 'Employment',      desc: 'Screening algorithms and promotion decisions.' },
-  { id: 'banking',   num: '02', title: 'Banking & Credit', domain: 'Finance',         desc: 'Loan, credit card, and mortgage approvals.' },
-  { id: 'health',    num: '03', title: 'Healthcare',       domain: 'Medicine',        desc: 'Treatment access and diagnostic outcomes.' },
-  { id: 'edu',       num: '04', title: 'Education',        domain: 'Admissions',      desc: 'University and scholarship selection.' },
-  { id: 'justice',   num: '05', title: 'Criminal Justice', domain: 'Legal',           desc: 'Bail, parole, and sentencing recommendations.' },
-  { id: 'insurance', num: '06', title: 'Insurance',        domain: 'Risk pricing',    desc: 'Premium rates and claim approvals.' },
-  { id: 'gov',       num: '07', title: 'Government',       domain: 'Public services', desc: 'Welfare, benefits, and subsidy allocation.' },
-  { id: 'social',    num: '08', title: 'Social Media',     domain: 'Moderation',      desc: 'Content removal and account restrictions.' },
-  { id: 'commerce',  num: '09', title: 'E-Commerce',       domain: 'Retail',          desc: 'Ad targeting and dynamic pricing systems.' },
-  { id: 'housing',   num: '10', title: 'Real Estate',      domain: 'Property',        desc: 'Valuation algorithms and listing access.' },
-  { id: 'police',    num: '11', title: 'Policing',         domain: 'Public safety',   desc: 'Predictive patrol and risk scoring tools.' },
-  { id: 'climate',   num: '12', title: 'Energy Access',    domain: 'Environment',     desc: 'Green tech grants and subsidy distribution.' },
-  { id: 'legal',     num: '13', title: 'AI Compliance',    domain: 'Regulation',      desc: 'EU AI Act Article 9 fairness requirements.' },
-  { id: 'sme',       num: '14', title: 'Small Business',   domain: 'Finance',         desc: 'SME funding and market access algorithms.' },
-  { id: 'citizen',   num: '15', title: 'Citizen Rights',   domain: 'Governance',      desc: 'Right-to-explanation under AI decision-making.' }
+  { id: 'hiring',    num: '01', title: 'Hiring',           domain: 'Employment',      desc: 'Screening algorithms and promotion decisions.',     analyzes: 'Selection rate by gender or ethnicity' },
+  { id: 'banking',   num: '02', title: 'Banking & Credit', domain: 'Finance',         desc: 'Loan, credit card, and mortgage approvals.',        analyzes: 'Approval rate by race, gender, or income' },
+  { id: 'health',    num: '03', title: 'Healthcare',       domain: 'Medicine',        desc: 'Treatment access and diagnostic outcomes.',         analyzes: 'Treatment access by income or ethnicity' },
+  { id: 'edu',       num: '04', title: 'Education',        domain: 'Admissions',      desc: 'University and scholarship selection.',             analyzes: 'Admission rate by gender or race' },
+  { id: 'justice',   num: '05', title: 'Criminal Justice', domain: 'Legal',           desc: 'Bail, parole, and sentencing recommendations.',     analyzes: 'Bail/parole rate by race or age' },
+  { id: 'insurance', num: '06', title: 'Insurance',        domain: 'Risk pricing',    desc: 'Premium rates and claim approvals.',                analyzes: 'Premium rate by location or age' },
+  { id: 'gov',       num: '07', title: 'Government',       domain: 'Public services', desc: 'Welfare, benefits, and subsidy allocation.',        analyzes: 'Benefit approval by income or ethnicity' },
+  { id: 'social',    num: '08', title: 'Social Media',     domain: 'Moderation',      desc: 'Content removal and account restrictions.',        analyzes: 'Removal rate by group or affiliation' },
+  { id: 'commerce',  num: '09', title: 'E-Commerce',       domain: 'Retail',          desc: 'Ad targeting and dynamic pricing systems.',        analyzes: 'Ad exposure rate by age, gender, or location' },
+  { id: 'housing',   num: '10', title: 'Real Estate',      domain: 'Property',        desc: 'Valuation algorithms and listing access.',         analyzes: 'Valuation/approval by race or location' },
+  { id: 'police',    num: '11', title: 'Policing',         domain: 'Public safety',   desc: 'Predictive patrol and risk scoring tools.',        analyzes: 'Stop/arrest rate by race or location' },
+  { id: 'climate',   num: '12', title: 'Energy Access',    domain: 'Environment',     desc: 'Green tech grants and subsidy distribution.',      analyzes: 'Subsidy access by income or location' },
+  { id: 'legal',     num: '13', title: 'AI Compliance',    domain: 'Regulation',      desc: 'EU AI Act Article 9 fairness requirements.',       analyzes: 'Compliance score by protected attribute' },
+  { id: 'sme',       num: '14', title: 'Small Business',   domain: 'Finance',         desc: 'SME funding and market access algorithms.',        analyzes: 'Funding approval by gender or ethnicity' },
+  { id: 'citizen',   num: '15', title: 'Citizen Rights',   domain: 'Governance',      desc: 'Right-to-explanation under AI decision-making.',   analyzes: 'Decision rights by protected class' }
 ];
 
-const NAV_STEPS: { id: Step; label: string }[] = [
-  { id: 'upload',     label: 'Data Input' },
-  { id: 'problem',    label: 'Mission' },
-  { id: 'processing', label: 'Audit Math' },
-  { id: 'audit',      label: 'AI Review' },
-  { id: 'resolution', label: 'Impact Proof' }
+const NAV_STEPS: { id: Step; label: string; sublabel: string }[] = [
+  { id: 'upload',     label: 'Upload Data',      sublabel: 'Import your dataset' },
+  { id: 'problem',    label: 'Select Context',   sublabel: 'Choose a scenario' },
+  { id: 'processing', label: 'Math Check',       sublabel: 'Bias detection' },
+  { id: 'audit',      label: 'AI Explanation',   sublabel: 'Plain-language results' },
+  { id: 'resolution', label: 'Resolution',       sublabel: 'Fix & certify' }
 ];
 
 const STEP_ORDER: Step[] = ['upload', 'preview', 'problem', 'processing', 'audit', 'resolution'];
 
 const LOG_STEPS = [
   "Parsing data structure…",
-  "Layer 1 · Math Engine active",
+  "Step 1 · Math Engine active",
   "Identifying protected groups…",
   "Computing approval rates per group…",
   "Applying 4/5ths disparate impact rule…",
-  "Layer 2 · AI Explainer initialising…",
+  "Step 2 · AI Explainer initialising…",
   "Audit complete — results ready."
 ];
 
-// ─── Column Match Helper ──────────────────────────────────────────────────────
+// ─── Column Match Helpers ─────────────────────────────────────────────────────
 
-function matchColumns(columnNames: string[], keywords: string[]): string | null {
-  const lower = columnNames.map(c => c.toLowerCase().replace(/[^a-z]/g, ''));
+function matchColumns(cols: string[], keywords: string[]): string | null {
+  const lower = cols.map(c => c.toLowerCase().replace(/[^a-z]/g, ''));
   for (const kw of keywords) {
-    const idx = lower.findIndex(c => c.includes(kw) || kw.includes(c));
-    if (idx >= 0) return columnNames[idx];
+    const i = lower.findIndex(c => c.includes(kw) || kw.includes(c));
+    if (i >= 0) return cols[i];
   }
   return null;
 }
 
-interface ColumnMatchResult {
-  sensitiveCol: string | null;
-  outcomeCol: string | null;
-  sensitiveOriginal: string | null;
-  outcomeOriginal: string | null;
-  isGoodMatch: boolean;
+interface ColumnMatch { sensitiveCol: string | null; outcomeCol: string | null; isGoodMatch: boolean; }
+
+function evaluateColumnMatch(cols: string[], pid: string): ColumnMatch {
+  const m = PROBLEM_MAPPINGS[pid];
+  if (!m) return { sensitiveCol: null, outcomeCol: null, isGoodMatch: false };
+  const s = matchColumns(cols, m.sensitiveKeywords);
+  const o = matchColumns(cols, m.outcomeKeywords);
+  return { sensitiveCol: s, outcomeCol: o, isGoodMatch: s !== null && o !== null };
 }
 
-function evaluateColumnMatch(columnNames: string[], problemId: string): ColumnMatchResult {
-  const mapping = PROBLEM_MAPPINGS[problemId];
-  if (!mapping) return { sensitiveCol: null, outcomeCol: null, sensitiveOriginal: null, outcomeOriginal: null, isGoodMatch: false };
-  const s = matchColumns(columnNames, mapping.sensitiveKeywords);
-  const o = matchColumns(columnNames, mapping.outcomeKeywords);
-  return {
-    sensitiveCol: s,
-    outcomeCol: o,
-    sensitiveOriginal: s,
-    outcomeOriginal: o,
-    isGoodMatch: s !== null && o !== null
-  };
-}
-
-// ─── StatusBadge ─────────────────────────────────────────────────────────────
+// ─── Shared Components ────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
   const ok = status !== 'BIAS DETECTED';
@@ -160,66 +146,249 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ─── 3-Layer Header ──────────────────────────────────────────────────────────
+// ─── Animated Layer Connector ─────────────────────────────────────────────────
+
+function LayerConnector({ filled, color }: { filled: boolean; color: 'emerald' | 'blue' }) {
+  const fillColor = color === 'emerald' ? 'bg-emerald-400' : 'bg-blue-400';
+  const arrowColor = filled ? (color === 'emerald' ? 'text-emerald-400' : 'text-blue-400') : 'text-slate-200';
+  return (
+    <div className="flex flex-col items-center justify-center w-10 shrink-0 gap-0.5">
+      <div className="w-full h-[2px] bg-slate-100 rounded-full overflow-hidden relative">
+        <motion.div className={cn('absolute inset-y-0 left-0 rounded-full', fillColor)}
+          initial={{ width: '0%' }} animate={{ width: filled ? '100%' : '0%' }}
+          transition={{ duration: 0.7, ease: 'easeInOut' }}
+        />
+      </div>
+      <ArrowRight className={cn('w-3 h-3 transition-colors duration-500', arrowColor)} />
+    </div>
+  );
+}
+
+// ─── 3-Layer Header with animated connectors ──────────────────────────────────
 
 function LayerHeader({ step }: { step: Step }) {
   const l1Active = step === 'processing';
   const l2Active = step === 'audit';
   const l3Active = step === 'resolution';
-  const l1Done = ['audit', 'resolution'].includes(step);
-  const l2Done = step === 'resolution';
+  const l1Done   = ['audit', 'resolution'].includes(step);
+  const l2Done   = step === 'resolution';
 
   const layers = [
-    { label: 'Layer 1 · Math Engine',    sub: 'Objective detection. Zero AI.',   active: l1Active, done: l1Done, color: 'emerald' as const },
-    { label: 'Layer 2 · AI Explainer',   sub: 'Translates results to language.', active: l2Active, done: l2Done, color: 'blue' as const },
-    { label: 'Layer 3 · Parity Lock',    sub: 'Verification & compliance.',      active: l3Active, done: false,  color: 'purple' as const }
+    { key: 'l1', num: '1', label: 'Math Engine',  sub: 'Detects bias with math only.', active: l1Active, done: l1Done, color: 'emerald' as const },
+    { key: 'l2', num: '2', label: 'AI Explainer', sub: 'Translates results to language.', active: l2Active, done: l2Done, color: 'blue' as const },
+    { key: 'l3', num: '3', label: 'Parity Lock',  sub: 'Applies fix & certifies.', active: l3Active, done: l3Active, color: 'purple' as const }
   ];
 
+  const cardStyle = (l: typeof layers[0]) => {
+    if (l.active) return ({
+      emerald: 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-400/20',
+      blue:    'bg-blue-50 border-blue-300 ring-2 ring-blue-400/20',
+      purple:  'bg-purple-50 border-purple-300 ring-2 ring-purple-400/20'
+    })[l.color];
+    if (l.done) return 'bg-slate-50 border-emerald-200';
+    return 'bg-slate-50 border-slate-100 opacity-40';
+  };
+
+  const labelStyle = (l: typeof layers[0]) => {
+    if (l.active) return ({ emerald: 'text-emerald-700', blue: 'text-blue-700', purple: 'text-purple-700' })[l.color];
+    if (l.done) return 'text-emerald-700';
+    return 'text-slate-400';
+  };
+
+  const dotColor = ({ emerald: 'bg-emerald-500', blue: 'bg-blue-500', purple: 'bg-purple-500' });
+
   return (
-    <div className="grid grid-cols-3 gap-3 mb-4">
-      {layers.map(l => (
-        <div key={l.label} className={cn(
-          'p-3 rounded-xl border transition-all duration-500 relative',
-          l.active ? {
-            emerald: 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-500/20',
-            blue:    'bg-blue-50 border-blue-300 ring-2 ring-blue-500/20',
-            purple:  'bg-purple-50 border-purple-300 ring-2 ring-purple-500/20'
-          }[l.color] : l.done ? 'bg-slate-50 border-slate-200' : 'bg-slate-50 border-slate-100 opacity-40'
-        )}>
-          {l.active && (
-            <span className={cn('absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full animate-pulse',
-              { emerald: 'bg-emerald-500', blue: 'bg-blue-500', purple: 'bg-purple-500' }[l.color]
-            )} />
-          )}
-          {l.done && <CheckCircle2 className="absolute top-2.5 right-2.5 w-3.5 h-3.5 text-emerald-500" />}
-          <p className={cn('text-[10px] font-bold mb-0.5',
-            l.active ? { emerald: 'text-emerald-600', blue: 'text-blue-600', purple: 'text-purple-600' }[l.color]
-                     : l.done ? 'text-emerald-600' : 'text-slate-400'
-          )}>{l.label}</p>
-          <p className="text-[11px] text-slate-500 leading-tight">{l.sub}</p>
-        </div>
+    <div className="flex items-center gap-0 mb-4">
+      {layers.map((l, i) => (
+        <React.Fragment key={l.key}>
+          <div className={cn('flex-1 p-3 rounded-xl border transition-all duration-500 relative', cardStyle(l))}>
+            {l.active && <span className={cn('absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full animate-pulse', dotColor[l.color])} />}
+            {l.done && !l.active && <CheckCircle2 className="absolute top-2.5 right-2.5 w-3.5 h-3.5 text-emerald-500" />}
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <div className={cn('w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shrink-0',
+                l.active ? ({ emerald: 'bg-emerald-500', blue: 'bg-blue-500', purple: 'bg-purple-500' })[l.color] + ' text-white'
+                : l.done  ? 'bg-emerald-500 text-white'
+                : 'bg-slate-200 text-slate-400'
+              )}>
+                {l.done && !l.active ? '✓' : l.num}
+              </div>
+              <p className={cn('text-[11px] font-bold', labelStyle(l))}>{l.label}</p>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-tight pl-5.5">{l.sub}</p>
+          </div>
+          {i < 2 && <LayerConnector filled={i === 0 ? l1Done : l2Done} color={i === 0 ? 'emerald' : 'blue'} />}
+        </React.Fragment>
       ))}
     </div>
   );
 }
 
-// ─── Paradox Core Banner ─────────────────────────────────────────────────────
+// ─── Paradox Core Banner ──────────────────────────────────────────────────────
 
 function ParadoxBanner() {
   return (
-    <div className="bg-slate-900 rounded-xl px-5 py-4 mb-5 flex items-start gap-4">
-      <div className="w-8 h-8 bg-amber-500/20 border border-amber-500/30 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-        <HelpCircle className="w-4 h-4 text-amber-400" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-amber-400 mb-2">Paradox Core</p>
-        <div className="space-y-1 mb-3">
-          <p className="text-[11px] text-slate-400 italic">"If the system uses AI, won't the solution also be biased?"</p>
-          <p className="text-[11px] text-slate-300">"No. We use math to detect bias. AI only explains the results. Even if AI is wrong, the decision stays correct."</p>
-        </div>
-        <p className="text-sm font-black text-white bg-blue-600 inline-block px-3 py-1 rounded-lg tracking-tight">
-          Math makes the decision. AI just explains it.
+    <div className="bg-slate-900 rounded-xl px-5 py-4 mb-5">
+      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400 mb-3">Paradox Core</p>
+      <div className="space-y-2 mb-3">
+        <p className="text-[11px] text-slate-400 italic leading-relaxed">
+          "If our system uses AI, what if that AI is biased? Won't the solution also be biased?"
         </p>
+        <p className="text-[11px] text-slate-300 leading-relaxed">
+          "We don't use AI to make decisions. We use math to detect bias. AI only explains the results. So even if AI is wrong, the decision stays correct."
+        </p>
+      </div>
+      <div className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-1.5 rounded-lg">
+        <Calculator className="w-3.5 h-3.5" />
+        <span className="text-sm font-black tracking-tight">Math makes the decision. AI just explains it.</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Engine Modal ─────────────────────────────────────────────────────────────
+
+function EngineModal({ onClose }: { onClose: () => void }) {
+  const steps = [
+    {
+      num: '1', color: 'emerald', label: 'Math Engine (Layer 1)',
+      icon: <Calculator className="w-5 h-5 text-emerald-600" />,
+      what: 'What it does',
+      points: [
+        'Reads your dataset and counts decisions per group',
+        'Calculates each group\'s approval rate',
+        'Applies the 4/5ths rule to measure unfairness',
+        'Produces a single Disparate Impact score'
+      ],
+      note: 'No AI is involved. This is pure deterministic math.'
+    },
+    {
+      num: '2', color: 'blue', label: 'AI Explainer (Layer 2)',
+      icon: <BrainCircuit className="w-5 h-5 text-blue-600" />,
+      what: 'What it does',
+      points: [
+        'Receives the math results from Layer 1',
+        'Translates numbers into plain, readable language',
+        'Explains what the bias means in real-world terms',
+        'Never changes or overrides the math decision'
+      ],
+      note: 'AI explains — it does not decide. The math result is final.'
+    },
+    {
+      num: '3', color: 'purple', label: 'Parity Lock (Layer 3)',
+      icon: <ShieldCheck className="w-5 h-5 text-purple-600" />,
+      what: 'What it does',
+      points: [
+        'Applies mathematical reweighting to balance groups',
+        'Recalculates fairness score after mitigation',
+        'Generates a certified fairness audit report',
+        'Ensures compliance with EU AI Act Article 9'
+      ],
+      note: 'Only activated after bias is confirmed by Layer 1.'
+    }
+  ];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-black text-slate-900">How the System Works</h2>
+          <p className="text-sm text-slate-500 mt-0.5">3-layer architecture — one problem, three steps</p>
+        </div>
+        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
+          <X className="w-4 h-4 text-slate-500" />
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {steps.map((s, i) => (
+          <div key={s.num}>
+            <div className={cn('p-5 rounded-xl border-2', {
+              emerald: 'border-emerald-200 bg-emerald-50',
+              blue:    'border-blue-200 bg-blue-50',
+              purple:  'border-purple-200 bg-purple-50'
+            }[s.color])}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className={cn('w-8 h-8 rounded-full flex items-center justify-center', {
+                  emerald: 'bg-emerald-100', blue: 'bg-blue-100', purple: 'bg-purple-100'
+                }[s.color])}>
+                  {s.icon}
+                </div>
+                <div>
+                  <span className={cn('text-[9px] font-black uppercase tracking-widest', {
+                    emerald: 'text-emerald-600', blue: 'text-blue-600', purple: 'text-purple-600'
+                  }[s.color])}>Layer {s.num}</span>
+                  <p className="text-sm font-bold text-slate-900">{s.label}</p>
+                </div>
+              </div>
+              <ul className="space-y-1.5 mb-3">
+                {s.points.map(pt => (
+                  <li key={pt} className="flex items-start gap-2 text-sm text-slate-700">
+                    <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-0.5 text-slate-400" />
+                    {pt}
+                  </li>
+                ))}
+              </ul>
+              <p className={cn('text-xs font-semibold italic', {
+                emerald: 'text-emerald-700', blue: 'text-blue-700', purple: 'text-purple-700'
+              }[s.color])}>{s.note}</p>
+            </div>
+            {i < 2 && (
+              <div className="flex justify-center my-2">
+                <div className="flex flex-col items-center gap-0.5">
+                  <div className="w-0.5 h-4 bg-slate-300 rounded" />
+                  <ArrowRight className="w-3 h-3 text-slate-400 rotate-90" />
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 p-4 bg-slate-900 rounded-xl">
+        <p className="text-sm font-black text-white text-center">Math makes the decision. AI just explains it.</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Scenarios Modal ──────────────────────────────────────────────────────────
+
+function ScenariosModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-black text-slate-900">15 Fairness Problems</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Each scenario applies different fairness rules to your data</p>
+        </div>
+        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
+          <X className="w-4 h-4 text-slate-500" />
+        </button>
+      </div>
+
+      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl mb-5 flex items-start gap-2">
+        <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+        <p className="text-xs text-amber-800">
+          <strong>Why different scenarios?</strong> Your dataset is raw numbers. The scenario tells the Math Engine
+          <em> what kind of decision</em> is being made — so it knows what "fair" looks like in that context.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {SCENARIOS.map(s => (
+          <div key={s.id} className="p-3.5 bg-white border border-slate-200 rounded-xl">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[9px] font-bold text-blue-600 tracking-widest">{s.num}</span>
+              <span className="text-[9px] text-slate-400">{s.domain}</span>
+            </div>
+            <p className="text-xs font-bold text-slate-900 mb-1">{s.title}</p>
+            <p className="text-[9px] text-slate-500 leading-tight mb-2">{s.desc}</p>
+            <div className="flex items-center gap-1 pt-2 border-t border-slate-100">
+              <ChevronRight className="w-2.5 h-2.5 text-blue-500 shrink-0" />
+              <p className="text-[9px] font-semibold text-blue-600">{s.analyzes}</p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -229,14 +398,15 @@ function ParadoxBanner() {
 
 export default function App() {
   const [step, setStep]               = useState<Step>('upload');
+  const [modal, setModal]             = useState<Modal>(null);
   const [data, setData]               = useState(INITIAL_DATA);
   const [fileInfo, setFileInfo]       = useState<{ name: string; rows: number; cols: number; columnNames: string[] } | null>(null);
   const [isDemo, setIsDemo]           = useState(false);
-  const [suggestedProblem, setSuggestedProblem] = useState<string | null>(null);
+  const [suggestedProblem, setSuggested] = useState<string | null>(null);
   const [uploadErr, setUploadErr]     = useState('');
   const [uploadBusy, setUploadBusy]   = useState(false);
   const [scenario, setScenario]       = useState<string | null>(null);
-  const [columnMatch, setColumnMatch] = useState<ColumnMatchResult | null>(null);
+  const [colMatch, setColMatch]       = useState<ColumnMatch | null>(null);
   const [logs, setLogs]               = useState<string[]>([]);
   const [progress, setProgress]       = useState(0);
   const [metrics, setMetrics]         = useState<FairnessMetrics | null>(null);
@@ -251,40 +421,35 @@ export default function App() {
 
   const goReset = () => {
     setStep('upload'); setData(INITIAL_DATA); setFileInfo(null); setIsDemo(false);
-    setSuggestedProblem(null); setUploadErr(''); setUploadBusy(false); setScenario(null);
-    setColumnMatch(null); setLogs([]); setProgress(0); setMetrics(null); setOrigMetrics(null);
+    setSuggested(null); setUploadErr(''); setUploadBusy(false); setScenario(null);
+    setColMatch(null); setLogs([]); setProgress(0); setMetrics(null); setOrigMetrics(null);
     setExplanation(''); setHistory([]); setCsvData(''); setFixing(false);
   };
 
   const navState = (id: Step) => {
-    const cur = STEP_ORDER.indexOf(step);
-    const own = STEP_ORDER.indexOf(id);
+    const cur = STEP_ORDER.indexOf(step), own = STEP_ORDER.indexOf(id);
     const isActive = step === id || (id === 'upload' && step === 'preview');
-    const isDone = cur > own || (id === 'upload' && cur > 1);
+    const isDone   = cur > own || (id === 'upload' && cur > 1);
     return { isActive, isDone };
   };
 
   // ── File parse ──────────────────────────────────────────────────────────────
 
   const parseFile = (file: File) => {
-    setUploadBusy(true); setUploadErr(''); setIsDemo(false); setSuggestedProblem(null);
+    setUploadBusy(true); setUploadErr(''); setIsDemo(false); setSuggested(null);
     const reader = new FileReader();
-    reader.onerror = () => { setUploadBusy(false); setUploadErr('Could not read the file. Please use a valid CSV.'); };
+    reader.onerror = () => { setUploadBusy(false); setUploadErr('Could not read the file.'); };
     reader.onload = (e) => {
       try {
         const text = (e.target?.result as string) || '';
         const lines = text.split(/\r?\n/).filter(l => l.trim());
-        if (lines.length < 2) throw new Error('File has fewer than 2 rows (header + data required).');
-
+        if (lines.length < 2) throw new Error('File needs at least a header row and one data row.');
         const headers = lines[0].split(',').map(h => h.trim());
         const hdrsLower = headers.map(h => h.toLowerCase());
-
         const gIdx = hdrsLower.findIndex(h => ['group','gender','sex','race','age','category','class','type','ethnicity'].some(k => h.includes(k)));
         const dIdx = hdrsLower.findIndex(h => ['decision','approved','result','outcome','score','target','label','hire','loan','admit','selected','flagged'].some(k => h.includes(k)));
-
-        if (gIdx < 0) throw new Error(`No group column found. Add a column named "group", "gender", "race", or similar. Your columns: ${headers.join(', ')}`);
-        if (dIdx < 0) throw new Error(`No decision column found. Add a column named "decision", "approved", "outcome", or similar. Your columns: ${headers.join(', ')}`);
-
+        if (gIdx < 0) throw new Error(`No group column found. Your columns: ${headers.join(', ')}`);
+        if (dIdx < 0) throw new Error(`No decision column found. Your columns: ${headers.join(', ')}`);
         const counts: Record<string, { total: number; approved: number }> = {};
         for (let i = 1; i < lines.length; i++) {
           const row = lines[i].split(',').map(c => c.trim());
@@ -296,55 +461,39 @@ export default function App() {
           if (['1','yes','approved','true','pass','ok','accept','accepted','hire','hired','admit','admitted','selected','treated'].includes(dec))
             counts[grp].approved++;
         }
-
         const keys = Object.keys(counts).sort((a, b) => counts[b].total - counts[a].total);
-        if (keys.length < 2) throw new Error(`Only 1 group found (need at least 2). Groups detected: ${keys.join(', ')}`);
-
+        if (keys.length < 2) throw new Error(`Only 1 group detected (need 2+). Groups: ${keys.join(', ')}`);
         setData({ groupA: { name: keys[1], ...counts[keys[1]] }, groupB: { name: keys[0], ...counts[keys[0]] } });
         setFileInfo({ name: file.name, rows: lines.length - 1, cols: headers.length, columnNames: headers });
-        setUploadBusy(false);
-        setStep('preview');
+        setUploadBusy(false); setStep('preview');
       } catch (err: any) {
-        setUploadBusy(false);
-        setUploadErr(err.message || 'Unknown error reading the file.');
+        setUploadBusy(false); setUploadErr(err.message || 'Unknown error reading the file.');
       }
     };
     reader.readAsText(file);
   };
 
-  // ── Problem selection → column validation ──────────────────────────────────
+  // ── Problem select → validate ──────────────────────────────────────────────
 
   const handleProblemSelect = (sid: string) => {
     setScenario(sid);
-    // If real CSV: evaluate column match and show result before running
-    if (!isDemo && fileInfo?.columnNames) {
+    if (!isDemo && fileInfo?.columnNames?.length) {
       const match = evaluateColumnMatch(fileInfo.columnNames, sid);
-      setColumnMatch(match);
-      // If columns are incompatible, show a warning step before proceeding
-      if (!match.isGoodMatch) {
-        setColumnMatch(match); // will show warning in the problem step
-        return; // let the user see the warning and confirm manually
-      }
+      if (!match.isGoodMatch) { setColMatch(match); return; }
     }
     runAnalysis(sid);
-  };
-
-  const confirmAndProceed = () => {
-    if (scenario) runAnalysis(scenario);
   };
 
   // ── Analysis ─────────────────────────────────────────────────────────────────
 
   const runAnalysis = async (sid: string) => {
-    setStep('processing'); setLogs([]); setProgress(0); setColumnMatch(null);
+    setStep('processing'); setLogs([]); setProgress(0); setColMatch(null);
     const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
-
     for (let i = 0; i < LOG_STEPS.length; i++) {
       await delay(620);
       addLog(LOG_STEPS[i]);
       setProgress(Math.round(((i + 1) / LOG_STEPS.length) * 100));
     }
-
     let m: FairnessMetrics;
     try {
       const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data }) });
@@ -357,7 +506,6 @@ export default function App() {
       const di = rB > 0 ? rA / rB : 0;
       m = { rateA: rA, rateB: rB, disparateImpact: di, demographicParityDiff: Math.abs(rA - rB), status: (di < 0.8 || di > 1.25) ? 'BIAS DETECTED' : 'MODEL FAIR' };
     }
-
     let exp = '';
     try {
       const res = await fetch('/api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metrics: m, context: { groupA: data.groupA.name, groupB: data.groupB.name } }) });
@@ -365,9 +513,8 @@ export default function App() {
       if (json.error) throw new Error(json.error);
       exp = json.explanation;
     } catch {
-      exp = `Comparing ${data.groupA.name} and ${data.groupB.name}: the fairness score of ${m.disparateImpact.toFixed(2)} ${m.status === 'BIAS DETECTED' ? 'falls below the 0.80 threshold — bias is statistically confirmed.' : 'meets the 0.80 standard — decisions are equitable across groups.'}`;
+      exp = `Comparing ${data.groupA.name} and ${data.groupB.name}: fairness score of ${m.disparateImpact.toFixed(2)} ${m.status === 'BIAS DETECTED' ? 'falls below the 0.80 threshold — bias confirmed.' : 'meets the 0.80 standard — decisions are equitable.'}`;
     }
-
     setMetrics(m); setOrigMetrics(m); setExplanation(exp);
     setHistory([{ label: 'Original', metrics: m }]);
     setStep('audit');
@@ -389,8 +536,7 @@ export default function App() {
       setHistory(prev => [...prev, { label: 'Mitigated', metrics: m2 }]);
       setMetrics(m2);
     }
-    setFixing(false);
-    setStep('resolution');
+    setFixing(false); setStep('resolution');
   };
 
   const downloadCSV = () => {
@@ -408,64 +554,97 @@ export default function App() {
   return (
     <div className="h-screen bg-[#f8fafc] text-slate-900 font-sans flex flex-col overflow-hidden">
 
+      {/* ── Modal Overlay ──────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {modal && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6"
+            onClick={(e) => { if (e.target === e.currentTarget) setModal(null); }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-7"
+            >
+              {modal === 'engine' && <EngineModal onClose={() => setModal(null)} />}
+              {modal === 'scenarios' && <ScenariosModal onClose={() => setModal(null)} />}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-6 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
             <ShieldCheck className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold tracking-tight text-slate-900">TrustOS</span>
+          <span className="font-bold tracking-tight">TrustOS</span>
           <span className="text-slate-300 hidden sm:block">|</span>
           <span className="text-slate-500 text-sm hidden sm:block">AI Fairness Audit</span>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setModal('engine')}
+            className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full hover:bg-emerald-100 transition-colors cursor-pointer"
+          >
             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
             Math Engine Active
-          </span>
-          <span className="text-[10px] font-bold px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full hidden md:block">
+          </button>
+          <button
+            onClick={() => setModal('scenarios')}
+            className="hidden md:flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full hover:bg-blue-100 transition-colors cursor-pointer"
+          >
             15 Problem Scenarios
-          </span>
+          </button>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left Sidebar ────────────────────────────────────────────────── */}
-        <nav className="w-56 border-r border-slate-200 bg-slate-50 p-5 flex flex-col gap-1.5 shrink-0">
+        <nav className="w-56 border-r border-slate-200 bg-slate-50 p-5 flex flex-col gap-1 shrink-0">
           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-3">Audit Journey</p>
 
           {NAV_STEPS.map((s, i) => {
             const { isActive, isDone } = navState(s.id);
             return (
               <div key={s.id} className={cn(
-                'flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-all duration-200',
-                isActive ? 'bg-white border border-slate-200 text-slate-900 font-bold shadow-sm'
-                : isDone  ? 'text-emerald-600 font-medium'
-                : 'text-slate-400'
+                'flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all duration-200',
+                isActive ? 'bg-white border border-slate-200 shadow-sm'
+                : isDone  ? ''
+                : ''
               )}>
                 <div className={cn(
-                  'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0',
+                  'w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0',
                   isActive ? 'bg-blue-600 text-white'
-                  : isDone  ? 'border border-emerald-500 text-emerald-500'
+                  : isDone  ? 'bg-emerald-100 border border-emerald-400 text-emerald-600'
                   : 'border border-slate-300 text-slate-400'
                 )}>
                   {isDone ? '✓' : i + 1}
                 </div>
-                {s.label}
+                <div>
+                  <p className={cn('text-xs font-bold leading-tight',
+                    isActive ? 'text-slate-900' : isDone ? 'text-emerald-700' : 'text-slate-400'
+                  )}>{s.label}</p>
+                  <p className={cn('text-[9px] leading-tight', isActive ? 'text-slate-500' : 'text-slate-400')}>{s.sublabel}</p>
+                </div>
               </div>
             );
           })}
 
-          <div className="mt-auto p-3 bg-slate-200/60 rounded-xl">
-            <p className="text-[9px] font-bold uppercase text-slate-500 mb-1.5">Engine Status</p>
-            <div className="flex justify-between text-[11px]">
-              <span className="text-slate-600">Math Layer</span>
-              <span className="text-emerald-600 font-bold">READY</span>
-            </div>
-            <div className="flex justify-between text-[11px] mt-1">
-              <span className="text-slate-600">AI Layer</span>
-              <span className="text-blue-600 font-bold">STANDBY</span>
+          <div className="mt-auto p-3 bg-white border border-slate-200 rounded-xl">
+            <p className="text-[9px] font-bold uppercase text-slate-400 mb-2">Engine Status</p>
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-600">Math Layer</span>
+                <span className="text-emerald-600 font-bold">READY</span>
+              </div>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-600">AI Layer</span>
+                <span className="text-blue-600 font-bold">STANDBY</span>
+              </div>
             </div>
           </div>
         </nav>
@@ -474,16 +653,12 @@ export default function App() {
         <main className="flex-1 overflow-y-auto bg-white">
           <div className="max-w-4xl mx-auto p-5">
 
-            {/* 3-Layer Header */}
             <LayerHeader step={step} />
-
-            {/* Paradox Core Banner */}
             <ParadoxBanner />
 
-            {/* Step Content */}
             <AnimatePresence mode="wait">
 
-              {/* ── UPLOAD ──────────────────────────────────────────────── */}
+              {/* ── UPLOAD ────────────────────────────────────────────────── */}
               {step === 'upload' && (
                 <motion.div key="upload" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                   className="bg-slate-50 border border-slate-200 rounded-2xl p-10 flex flex-col items-center text-center"
@@ -493,7 +668,7 @@ export default function App() {
                   </div>
                   <h2 className="text-xl font-bold mb-1.5">Upload Your Decision Data</h2>
                   <p className="text-sm text-slate-500 mb-7 max-w-xs">
-                    Any CSV with a group column and a decision column. The system handles 15 real-world fairness scenarios.
+                    Any CSV with a group column and a decision column. The system audits across 15 real-world fairness scenarios.
                   </p>
 
                   <input ref={fileRef} type="file" accept=".csv" className="hidden"
@@ -527,9 +702,7 @@ export default function App() {
                           onClick={() => {
                             setData(d.data);
                             setFileInfo({ name: d.title, rows: d.data.groupA.total + d.data.groupB.total, cols: 3, columnNames: [] });
-                            setIsDemo(true);
-                            setSuggestedProblem(d.suggestedProblem);
-                            setStep('preview');
+                            setIsDemo(true); setSuggested(d.suggestedProblem); setStep('preview');
                           }}
                           className="text-left p-4 bg-white border border-slate-200 hover:border-blue-400 hover:shadow-sm rounded-xl transition-all"
                         >
@@ -542,7 +715,7 @@ export default function App() {
                 </motion.div>
               )}
 
-              {/* ── PREVIEW ─────────────────────────────────────────────── */}
+              {/* ── PREVIEW ───────────────────────────────────────────────── */}
               {step === 'preview' && (
                 <motion.div key="preview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                   className="bg-white border border-slate-200 rounded-2xl p-8"
@@ -550,11 +723,11 @@ export default function App() {
                   <h2 className="text-lg font-bold mb-5 flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Dataset Verified
                   </h2>
-                  <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="grid grid-cols-3 gap-4 mb-5">
                     {[
-                      { label: 'Records',        val: (fileInfo?.rows || 1000).toLocaleString() },
-                      { label: 'Groups Found',   val: '2' },
-                      { label: 'Columns',        val: String(fileInfo?.cols || 3) }
+                      { label: 'Records',      val: (fileInfo?.rows || 1000).toLocaleString() },
+                      { label: 'Groups Found', val: '2' },
+                      { label: 'Columns',      val: String(fileInfo?.cols || 3) }
                     ].map(c => (
                       <div key={c.label} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{c.label}</p>
@@ -568,92 +741,86 @@ export default function App() {
                   {isDemo && suggestedProblem && (
                     <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-700 mb-5 flex items-start gap-2">
                       <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>Demo dataset suggestion: <strong>{SCENARIOS.find(s => s.id === suggestedProblem)?.title}</strong> scenario is recommended for this data.</span>
+                      <span>Recommended scenario: <strong>{SCENARIOS.find(s => s.id === suggestedProblem)?.title}</strong></span>
                     </div>
                   )}
                   <button onClick={() => setStep('problem')}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-200 transition-all"
                   >
-                    Continue to Scenario Selection <ArrowRight className="w-4 h-4" />
+                    Continue — Select Scenario <ArrowRight className="w-4 h-4" />
                   </button>
                 </motion.div>
               )}
 
-              {/* ── PROBLEM ─────────────────────────────────────────────── */}
+              {/* ── PROBLEM ───────────────────────────────────────────────── */}
               {step === 'problem' && (
                 <motion.div key="problem" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
 
-                  {/* Why this step exists — context explanation */}
                   <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 mb-5 flex items-start gap-3">
                     <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-bold text-amber-900 mb-1">Why choose a scenario?</p>
                       <p className="text-xs text-amber-800 leading-relaxed">
-                        Your dataset is raw numbers — it doesn't say <em>what kind of decision</em> it represents.
-                        The scenario tells the Math Engine what "fair" means in this context.
-                        A <strong>hiring dataset</strong> and a <strong>loan dataset</strong> may look identical but require completely different fairness rules.
+                        Your dataset is raw numbers — it doesn't say what <em>kind</em> of decision it represents.
+                        The scenario tells the Math Engine how to interpret the data. A hiring dataset and a loan dataset
+                        may look identical but require completely different fairness rules.
                       </p>
                       {isDemo && suggestedProblem && (
                         <p className="text-xs text-amber-700 mt-2 font-semibold">
-                          Recommended for your data: <strong className="text-amber-900">{SCENARIOS.find(s => s.id === suggestedProblem)?.title}</strong>
+                          Recommended for this data: <strong className="text-amber-900">{SCENARIOS.find(s => s.id === suggestedProblem)?.title}</strong>
                         </p>
                       )}
                     </div>
                   </div>
 
-                  {/* Column mismatch warning (real CSV only) */}
-                  {columnMatch && !columnMatch.isGoodMatch && (
+                  {/* Column mismatch warning */}
+                  {colMatch && !colMatch.isGoodMatch && (
                     <div className="bg-orange-50 border border-orange-300 rounded-xl px-5 py-4 mb-5">
                       <div className="flex items-start gap-3 mb-3">
                         <AlertCircle className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-bold text-orange-900">Column mismatch detected</p>
+                          <p className="text-sm font-bold text-orange-900">Column mismatch for this scenario</p>
                           <p className="text-xs text-orange-700 mt-1">
-                            The <strong>{currentScenario?.title}</strong> scenario expects columns for a sensitive attribute
-                            {!columnMatch.sensitiveCol ? ' (e.g. gender, race, age)' : ''} and decision outcome
-                            {!columnMatch.outcomeCol ? ' (e.g. approved, hired, selected)' : ''}.
+                            The <strong>{currentScenario?.title}</strong> scenario expects columns for a group attribute
+                            {!colMatch.sensitiveCol && ' (e.g. gender, race, age)'} and an outcome
+                            {!colMatch.outcomeCol && ' (e.g. approved, hired, selected)'}.
                           </p>
-                          <p className="text-xs text-orange-700 mt-1">
-                            Your columns: <span className="font-mono bg-orange-100 px-1 rounded">{fileInfo?.columnNames.join(', ')}</span>
-                          </p>
-                          <p className="text-xs text-orange-800 mt-2 font-semibold">
-                            This may mean you've selected the wrong scenario. Choose a different one, or proceed anyway.
-                          </p>
+                          {fileInfo?.columnNames?.length ? (
+                            <p className="text-xs text-orange-700 mt-1">
+                              Your columns: <span className="font-mono bg-orange-100 px-1 rounded">{fileInfo.columnNames.join(', ')}</span>
+                            </p>
+                          ) : null}
+                          <p className="text-xs text-orange-800 mt-2 font-semibold">You may have selected the wrong scenario. Choose a different one or proceed anyway.</p>
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={confirmAndProceed}
+                        <button onClick={() => { if (scenario) runAnalysis(scenario); }}
                           className="text-xs font-bold px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-                        >
-                          Proceed anyway
-                        </button>
-                        <button onClick={() => setColumnMatch(null)}
+                        >Proceed anyway</button>
+                        <button onClick={() => setColMatch(null)}
                           className="text-xs font-bold px-4 py-2 border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors"
-                        >
-                          Choose different scenario
-                        </button>
+                        >Choose different scenario</button>
                       </div>
                     </div>
                   )}
 
                   <div className="text-center mb-4">
                     <h2 className="text-xl font-bold">Select a Scenario</h2>
-                    <p className="text-sm text-slate-500 mt-1">The system can audit all 15 of these real-world fairness problems.</p>
+                    <p className="text-sm text-slate-500 mt-1">The Math Engine adapts its fairness rules based on your choice.</p>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
                     {SCENARIOS.map(s => {
-                      const isSuggested = isDemo && suggestedProblem === s.id;
+                      const isRec = isDemo && suggestedProblem === s.id;
                       return (
                         <button key={s.id} onClick={() => handleProblemSelect(s.id)}
                           className={cn(
                             'p-3.5 bg-white border rounded-xl text-left transition-all group relative',
-                            isSuggested
-                              ? 'border-blue-400 ring-2 ring-blue-500/20 shadow-md'
-                              : 'border-slate-200 hover:border-blue-400 hover:shadow-sm'
+                            isRec ? 'border-blue-400 ring-2 ring-blue-500/20 shadow-md'
+                                  : 'border-slate-200 hover:border-blue-400 hover:shadow-sm'
                           )}
                         >
-                          {isSuggested && (
+                          {isRec && (
                             <span className="absolute -top-2 right-3 text-[9px] font-black uppercase tracking-widest bg-blue-600 text-white px-2 py-0.5 rounded-full">
                               Recommended
                             </span>
@@ -663,7 +830,11 @@ export default function App() {
                             <span className="text-[9px] text-slate-400">{s.domain}</span>
                           </div>
                           <p className="text-xs font-bold text-slate-900 mb-1 group-hover:text-blue-700 transition-colors">{s.title}</p>
-                          <p className="text-[10px] text-slate-500 leading-tight">{s.desc}</p>
+                          <p className="text-[9px] text-slate-500 leading-tight mb-2">{s.desc}</p>
+                          <div className="flex items-center gap-1 pt-2 border-t border-slate-100">
+                            <ChevronRight className="w-2.5 h-2.5 text-blue-500 shrink-0" />
+                            <p className="text-[9px] font-semibold text-blue-600 leading-tight">{s.analyzes}</p>
+                          </div>
                         </button>
                       );
                     })}
@@ -671,7 +842,7 @@ export default function App() {
                 </motion.div>
               )}
 
-              {/* ── PROCESSING ──────────────────────────────────────────── */}
+              {/* ── PROCESSING ────────────────────────────────────────────── */}
               {step === 'processing' && (
                 <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   className="bg-slate-900 rounded-2xl p-10 flex flex-col items-center justify-center min-h-[340px] text-white shadow-2xl relative overflow-hidden"
@@ -693,7 +864,7 @@ export default function App() {
                       {logs.map((log, i) => (
                         <motion.p key={log + i} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
                           className={cn('text-sm font-mono transition-all',
-                            i === logs.length - 1 ? 'opacity-100 font-bold text-blue-300' : 'opacity-30'
+                            i === logs.length - 1 ? 'opacity-100 font-bold text-blue-300' : 'opacity-25'
                           )}
                         >{log}</motion.p>
                       ))}
@@ -703,7 +874,7 @@ export default function App() {
                 </motion.div>
               )}
 
-              {/* ── AUDIT ───────────────────────────────────────────────── */}
+              {/* ── AUDIT ─────────────────────────────────────────────────── */}
               {step === 'audit' && metrics && (
                 <motion.div key="audit" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
                   <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
@@ -758,14 +929,14 @@ export default function App() {
                 </motion.div>
               )}
 
-              {/* ── RESOLUTION ──────────────────────────────────────────── */}
+              {/* ── RESOLUTION ────────────────────────────────────────────── */}
               {step === 'resolution' && metrics && origMetrics && (
                 <motion.div key="resolution" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                   <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-5">
                       <div>
                         <h3 className="text-2xl font-black tracking-tight">Audit Complete</h3>
-                        <p className="text-emerald-600 text-sm font-semibold mt-0.5">Deterministic parity applied.</p>
+                        <p className="text-emerald-600 text-sm font-semibold mt-0.5">Deterministic parity applied. All 3 layers complete.</p>
                       </div>
                       <StatusBadge status="MODEL FAIR" />
                     </div>
@@ -773,13 +944,10 @@ export default function App() {
                     {history.length >= 2 && (
                       <div className="h-44 mb-5">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={[
-                              { name: 'Before Fix', score: history[0].metrics.disparateImpact },
-                              { name: 'After Fix',  score: history[1].metrics.disparateImpact }
-                            ]}
-                            margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
-                          >
+                          <BarChart data={[
+                            { name: 'Before Fix', score: history[0].metrics.disparateImpact },
+                            { name: 'After Fix',  score: history[1].metrics.disparateImpact }
+                          ]} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                             <XAxis dataKey="name" fontSize={11} axisLine={false} tickLine={false} />
                             <YAxis domain={[0, 1.3]} fontSize={11} axisLine={false} tickLine={false} />
@@ -788,8 +956,7 @@ export default function App() {
                             <ReferenceLine y={0.8} stroke="#f59e0b" strokeDasharray="4 2"
                               label={{ value: 'Fair line 0.80', position: 'insideTopRight', fontSize: 9, fill: '#b45309' }} />
                             <Bar dataKey="score" radius={[6,6,0,0]} maxBarSize={70}>
-                              <Cell fill="#ef4444" />
-                              <Cell fill="#10b981" />
+                              <Cell fill="#ef4444" /><Cell fill="#10b981" />
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
@@ -799,9 +966,7 @@ export default function App() {
                     <div className="grid grid-cols-2 gap-4 mb-5">
                       <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100">
                         <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Result</p>
-                        <p className="text-sm text-emerald-800 leading-relaxed">
-                          {data.groupA.name} and {data.groupB.name} now receive equal consideration.
-                        </p>
+                        <p className="text-sm text-emerald-800">{data.groupA.name} and {data.groupB.name} now receive equal consideration.</p>
                       </div>
                       <div className="bg-slate-900 p-5 rounded-2xl text-white">
                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Certificate</p>
@@ -833,49 +998,37 @@ export default function App() {
 
           <div className="space-y-5 flex-1">
             <div className="text-xs pb-4 border-b border-slate-100">
-              <p className="font-bold mb-2 text-slate-700">Layer 1 · Statistical Check</p>
+              <p className="font-bold mb-1 text-slate-700">Step 1: Data Analysis</p>
+              <p className="text-[10px] text-slate-400 mb-2">Math Engine — demographic parity check</p>
               <div className="flex justify-between items-center mb-1.5">
-                <p className="text-slate-500">Demographic Parity Index</p>
+                <p className="text-slate-500">Parity Index</p>
                 <span className="font-mono font-bold text-slate-900">{metrics?.demographicParityDiff.toFixed(2) ?? '–'}</span>
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="bg-red-400 h-full transition-all duration-700" style={{ width: `${Math.min((metrics?.demographicParityDiff ?? 0) * 100, 100)}%` }} />
+                <motion.div className="bg-red-400 h-full rounded-full"
+                  animate={{ width: `${Math.min((metrics?.demographicParityDiff ?? 0) * 100, 100)}%` }}
+                  transition={{ duration: 0.7 }}
+                />
               </div>
             </div>
 
             <div className="text-xs pb-4 border-b border-slate-100">
-              <p className="font-bold mb-2 text-slate-700">Layer 2 · Fairness Score</p>
+              <p className="font-bold mb-1 text-slate-700">Step 2: Math Result</p>
+              <p className="text-[10px] text-slate-400 mb-2">Disparate impact ratio (4/5ths rule)</p>
               <div className="flex justify-between items-center mb-1.5">
-                <p className="text-slate-500">Disparate Impact Ratio</p>
+                <p className="text-slate-500">Fairness Score</p>
                 <span className="font-mono font-bold text-slate-900">{metrics?.disparateImpact.toFixed(2) ?? '–'}</span>
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="bg-blue-400 h-full transition-all duration-700" style={{ width: `${Math.min((metrics?.disparateImpact ?? 0) * 70, 100)}%` }} />
+                <motion.div className="bg-blue-400 h-full rounded-full"
+                  animate={{ width: `${Math.min((metrics?.disparateImpact ?? 0) * 70, 100)}%` }}
+                  transition={{ duration: 0.7 }}
+                />
               </div>
             </div>
 
-            {step === 'problem' && (
-              <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700"
-              >
-                <p className="font-bold mb-1">Why 15 problems?</p>
-                <p className="leading-relaxed text-amber-600">Each problem uses different fairness rules. Banking bias ≠ Hiring bias. The engine adapts its math to the selected context.</p>
-              </motion.div>
-            )}
-
-            {step === 'audit' && (
-              <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                className="p-4 bg-blue-50 border border-blue-100 rounded-xl"
-              >
-                <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest mb-2">AI Layer Context</p>
-                <p className="text-[11px] text-blue-700 leading-relaxed italic">
-                  "Decision computed by Math Engine only. AI is explaining, not deciding."
-                </p>
-              </motion.div>
-            )}
-
-            <div className="text-xs">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Mitigation Strategy</p>
+            <div className="text-xs pb-4 border-b border-slate-100">
+              <p className="font-bold mb-2 text-slate-700">Step 3: Fix Method</p>
               {['Reweighting', 'Oversampling', 'Threshold Adjustment'].map(m => (
                 <label key={m} className="flex items-center gap-2 py-1.5">
                   <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300 flex items-center justify-center">
@@ -885,12 +1038,40 @@ export default function App() {
                 </label>
               ))}
             </div>
-          </div>
 
-          <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-            <p className="text-[9px] text-slate-400 uppercase italic leading-tight">
-              Validation Hash<br /><span className="font-mono text-slate-600 not-italic">0x8F22…BE09</span>
-            </p>
+            {step === 'problem' && (
+              <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                className="p-3 bg-amber-50 border border-amber-100 rounded-xl"
+              >
+                <p className="text-[9px] font-bold text-amber-700 uppercase tracking-widest mb-1">Why 15 scenarios?</p>
+                <p className="text-[10px] text-amber-700 leading-relaxed">Banking bias ≠ Hiring bias. Each scenario applies different fairness rules to the same raw data.</p>
+              </motion.div>
+            )}
+
+            {step === 'audit' && (
+              <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-blue-50 border border-blue-100 rounded-xl"
+              >
+                <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest mb-2">AI Layer Note</p>
+                <p className="text-[11px] text-blue-700 italic leading-relaxed">"Decision computed by Math Engine. AI is only explaining the result."</p>
+              </motion.div>
+            )}
+
+            {step === 'resolution' && (
+              <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl"
+              >
+                <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mb-2">All 3 Layers Complete</p>
+                <div className="space-y-1">
+                  {['Math Engine', 'AI Explainer', 'Parity Lock'].map((l, i) => (
+                    <div key={l} className="flex items-center gap-2 text-[10px]">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                      <span className="text-emerald-700 font-medium">{l}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
           </div>
         </aside>
 

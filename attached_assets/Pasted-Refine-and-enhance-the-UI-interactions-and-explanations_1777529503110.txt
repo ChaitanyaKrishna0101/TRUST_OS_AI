@@ -1,0 +1,107 @@
+Refine and enhance the UI, interactions, and explanations of the application with a strong focus on clarity, usability, and a premium look and feel. Follow all instructions strictly.
+
+1. SCENARIO SECTION (15 PROBLEMS – CLEAR EXPLANATION)
+
+* In the “15 Problem Scenarios” section, explain each problem in a simple and structured way like:
+
+Example:
+If user selects: Hiring Bias
+→ Analyze: selection rate by gender
+
+If user selects: Loan Bias
+→ Analyze: approval rate based on income + gender
+
+* Keep explanations short, clean, and easy to understand
+* Use a neat card/grid layout
+* Apply consistent colors, spacing, and readable fonts that match the overall UI
+
+2. FIX BUTTON FUNCTIONALITY (CRITICAL)
+
+* Ensure both buttons are fully clickable and interactive:
+
+  * “Math Engine Active”
+  * “15 Problem Scenarios”
+
+* When “Math Engine Active” is clicked:
+
+  * Show full system design clearly (3-layer flow)
+  * Explain what happens at each layer in simple terms
+  * Help users understand how the system works internally
+
+* When “15 Problem Scenarios” is clicked:
+
+  * Show all 15 problems
+  * Explain what each solves and its real-world impact
+  * Keep it simple, not technical
+
+* Add a clear “Back” option to return to the main interface
+
+3. UI / DESIGN IMPROVEMENTS
+
+* Use a clean, modern, premium UI style
+* Improve fonts (simple, readable, consistent)
+* Use a matching color palette across all sections
+* Maintain proper alignment, spacing, and visual hierarchy
+* Ensure smooth animations and transitions between sections
+
+4. SIMPLIFY LEFT SIDE LABELS
+
+* Replace confusing labels like:
+  “Layer 1”, “Layer 2”, “Mitigation Strategy”
+
+* Use simple terms instead:
+
+  * “Step 1: Data Analysis (Math)”
+  * “Step 2: Processing”
+  * “Step 3: Explanation”
+
+* Keep wording simple and meaningful
+
+5. REMOVE UNUSED / CONFUSING ELEMENTS
+
+* Remove:
+  “Validation Hash 0x8F22…BE09”
+* Remove or simplify any unclear or unnecessary UI elements
+
+6. IMPROVE 3-LAYER VISIBILITY
+
+* Make Layer 1, Layer 2, Layer 3 clearly visible
+* Add visual distinction (color, borders, or highlighting)
+* Ensure users can easily identify each layer
+
+7. ADD STEP FLOW ANIMATIONS
+
+* Add smooth animations showing flow between layers:
+
+  * Line movement from one layer to another
+  * Color transitions when a step is completed
+* Ensure final layer clearly shows “Completed” or final output state
+* Fix current issue where final step is not visually completed
+
+8. KEEP LAYER EXPLANATIONS SIMPLE
+
+* Avoid complex terms
+* Use short, clear explanations for each layer
+* Ensure users can understand the system without technical knowledge
+
+9. PARADOX CORE SECTION (DISPLAY EXACTLY LIKE THIS)
+
+PARADOX CORE:
+“If our system uses AI, what if that AI is biased? Won’t the solution also be biased?”
+
+“We don’t use AI to make decisions. We use math to detect bias. AI only explains the results. So even if AI is wrong, the decision stays correct.”
+
+“Math makes the decision. AI just explains it.”
+
+* Display this clearly with good typography and spacing
+* Make it visually stand out but clean and readable
+
+10. OVERALL EXPERIENCE
+
+* Keep everything clean, simple, and well-structured
+* Ensure smooth navigation and transitions
+* Avoid clutter and unnecessary complexity
+* Focus on clarity, usability, and strong visual presentation
+
+Final Goal:
+A polished, premium-looking interface where all elements are functional, easy to understand, visually appealing, and clearly explain how the system works and solves real-world problems.

@@ -210,10 +210,10 @@ That's it. No technical setup needed to run an audit.
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/paradox-conscience.git
+git clone https://github.com/your-username/TRUST_OS_AI.git
 
 # 2. Navigate into the project
-cd paradox-conscience
+cd TRUST_OS_AI
 
 # 3. Install dependencies
 npm install
